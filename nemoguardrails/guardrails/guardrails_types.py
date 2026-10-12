@@ -22,7 +22,7 @@ from enum import Enum
 from typing import Any, Optional, TypeAlias
 
 from nemoguardrails.actions.rail_outcome import RailOutcome
-from nemoguardrails.exceptions import InvalidCheckRequestError
+from nemoguardrails.exceptions import UnreadableContentPartError
 from nemoguardrails.rails.llm.options import MAX_QUOTED_IDENTITY_LENGTH, ToolViolation
 from nemoguardrails.types import LLMResponse, UsageInfo
 
@@ -64,7 +64,7 @@ _KNOWN_PART_TYPES = frozenset({"text", "refusal", "image_url", "file", "input_au
 
 
 def flatten_text_parts(messages: LLMMessages, roles: tuple[str, ...] = ("user", "assistant")) -> LLMMessages:
-    """Join list content on *roles* into one string; a non-text part raises InvalidCheckRequestError."""
+    """Join list content on *roles* into one string; a non-text part raises UnreadableContentPartError."""
     return [_flattened(message, index, roles) for index, message in enumerate(messages)]
 
 
@@ -83,10 +83,7 @@ def _part_text(part: Any, role: str, index: int, part_index: int) -> str:
     """The text one content part contributes to its message."""
     problem = _unreadable_part_problem(part, role)
     if problem is not None:
-        raise InvalidCheckRequestError(
-            f"cannot check messages[{index}] ({role}): content part {part_index} {problem}; "
-            "a check reads only text parts, and refusal parts on assistant messages"
-        )
+        raise UnreadableContentPartError(message_index=index, role=role, part_index=part_index, problem=problem)
     # A text part holds its text under "text", and a refusal part under "refusal".
     return part[part["type"]]
 

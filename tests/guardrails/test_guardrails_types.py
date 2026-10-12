@@ -21,7 +21,7 @@ from typing import Any, ClassVar
 import pytest
 
 from nemoguardrails.actions.rail_outcome import RailOutcome
-from nemoguardrails.exceptions import InvalidCheckRequestError
+from nemoguardrails.exceptions import InvalidCheckRequestError, UnreadableContentPartError
 from nemoguardrails.guardrails.guardrails_types import (
     LLMMessage,
     LLMMessages,
@@ -502,6 +502,43 @@ class TestFlattenTextParts:
         assert "user" in error
         assert "messages[1]" in error
         assert "image_url" in error
+
+    def test_a_non_text_part_raises_a_structured_error(self):
+        """The error is an UnreadableContentPartError carrying the part's location and problem as fields."""
+        messages = [
+            {"role": "system", "content": "Be helpful."},
+            {"role": "user", "content": [_text_part("Hi"), {"type": "image_url", "image_url": {"url": "x"}}]},
+        ]
+
+        with pytest.raises(UnreadableContentPartError) as exc_info:
+            flatten_text_parts(messages)
+
+        error = exc_info.value
+        assert isinstance(error, InvalidCheckRequestError)
+        assert (error.message_index, error.role, error.part_index, error.problem) == (
+            1,
+            "user",
+            1,
+            "has type 'image_url'",
+        )
+        assert str(error) == (
+            "cannot check messages[1] (user): content part 1 has type 'image_url'; "
+            "a check reads only text parts, and refusal parts on assistant messages"
+        )
+
+
+class TestUnreadableContentPartError:
+    """Tests for the structured error flatten_text_parts raises."""
+
+    def test_at_message_index_moves_only_the_position(self):
+        """at_message_index returns the same error at a new message position, with the message text to match."""
+        error = UnreadableContentPartError(message_index=1, role="user", part_index=0, problem="has type 'file'")
+
+        moved = error.at_message_index(0)
+
+        assert (moved.message_index, moved.role, moved.part_index, moved.problem) == (0, "user", 0, "has type 'file'")
+        assert str(moved).startswith("cannot check messages[0] (user): content part 0 has type 'file';")
+        assert error.message_index == 1
 
     @pytest.mark.parametrize(
         "message",
