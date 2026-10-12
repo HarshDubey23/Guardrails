@@ -86,7 +86,7 @@ class RailTypeNotSupportedError(InvalidRailsConfigurationError):
 
 
 class InvalidCheckRequestError(ValueError):
-    """Raised when a check's arguments contradict each other, such as `tools` without a `tool_call` check."""
+    """Raised when a check cannot serve its arguments, such as `tools` without a `tool_call` check or an image part."""
 
     pass
 

@@ -482,6 +482,34 @@ def test_check_with_unread_tools_returns_422_under_iorails_alias(tool_rails_alia
     stubbed_main_model.assert_not_awaited()
 
 
+def test_check_with_an_image_part_returns_422_under_iorails_alias(iorails_alias, monkeypatch, stubbed_main_model):
+    """/v1/checks on IORails refuses an image part with a 422 naming it, instead of skipping the input rails."""
+
+    async def _fake_start(self):
+        self._running = True
+
+    monkeypatch.setenv("NVIDIA_API_KEY", "test-key")
+    monkeypatch.setattr(IORails, "start", _fake_start)
+    content = [
+        {"type": "text", "text": "What is in this picture?"},
+        {"type": "image_url", "image_url": {"url": "https://example.com/cat.png"}},
+    ]
+
+    client = TestClient(api.app, raise_server_exceptions=False)
+    response = client.post(
+        "/v1/checks",
+        json={
+            "model": "test-model",
+            "messages": [{"role": "user", "content": content}],
+            "guardrails": {"config_id": "content_safety"},
+        },
+    )
+
+    assert response.status_code == 422
+    assert "image_url" in response.json()["error"]["message"]
+    stubbed_main_model.assert_not_awaited()
+
+
 # A Colang input rail, which LLMRails runs through its own runtime: the config the server holds when
 # NEMO_GUARDRAILS_IORAILS_ENGINE is unset.
 INPUT_RAIL_COLANG = """
