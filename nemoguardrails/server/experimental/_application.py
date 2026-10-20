@@ -50,8 +50,8 @@ async def _lifespan(application: FastAPI):
         raise TypeError("The HTTP transport factory must return an httpx.AsyncBaseTransport.")
     try:
         runtime = ServerRuntime.create(
-            application.state.experimental_rails_configs,
-            application.state.experimental_config_resolver,
+            application.state.proxy_rails_configs,
+            application.state.proxy_config_resolver,
             http_transport=transport,
         )
     except BaseException:
@@ -105,8 +105,8 @@ def create_proxy_application(
 
     application = FastAPI(lifespan=_lifespan)
     application.state.proxy_http_transport_factory = http_transport_factory
-    application.state.experimental_rails_configs = resolved_configs
-    application.state.experimental_config_resolver = resolved_resolver
+    application.state.proxy_rails_configs = resolved_configs
+    application.state.proxy_config_resolver = resolved_resolver
 
     async def resolve_checker(request, provider_type, provider_instance_id, operation_name):
         return await get_runtime(application).resolve_content_checker(
