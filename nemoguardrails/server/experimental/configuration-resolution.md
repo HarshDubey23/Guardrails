@@ -101,11 +101,13 @@ are identical. Requests perform a synchronous lookup of an already-started
 checker; they do not parse files, construct engines, or share startup tasks.
 
 If parsing, engine construction, or startup fails, the application does not
-accept traffic. Already-started checkers and the shared HTTP client are closed;
-the engine whose startup failed owns rollback of its incomplete initialization.
-Cancellation during startup follows the same rollback path. There is no
-partially ready catalog or request-time retry of a failed configuration. A new
-application lifespan constructs a fresh catalog.
+accept traffic. Cleanup is attempted for every acquired engine, including the
+one whose startup failed, and for the shared HTTP client. Cancellation during
+startup follows the same rollback path. There is no partially ready catalog or
+request-time retry of a failed configuration. Incomplete engine cleanup stays
+owned by the application without publishing a ready runtime. A subsequent
+application lifespan retries that cleanup and constructs a fresh catalog only
+after it succeeds; otherwise startup is rejected again.
 
 Preloading trades longer startup and resources for potentially unused configs
 for fail-fast initialization and predictable request latency. Resolver errors

@@ -35,8 +35,9 @@ class GuardrailsRepository:
 
     File parsing runs in a worker thread; engine construction and startup stay
     on the application loop. Requests only look up already-started checkers.
-    Startup failure closes earlier checkers and prevents readiness. Shutdown
-    gives each owner a shielded, cooperative budget; failed cleanup is retryable.
+    Startup failure attempts cleanup of all acquired engines and prevents
+    readiness. Shutdown gives each owner a shielded, cooperative budget;
+    failed cleanup is retryable.
     """
 
     def __init__(self, entries: Sequence[ConfigEntry]):
@@ -50,9 +51,9 @@ class GuardrailsRepository:
     async def startup(self) -> None:
         """Initialize every declared config once, or roll back the whole catalog.
 
-        Engines roll back their own incomplete startup. This repository owns
-        completed startups and closes them if any later load fails or startup
-        is cancelled. A failed repository is closed, not reusable.
+        Retain engines before startup so incomplete core rollback can be retried.
+        Failed or cancelled startup attempts cleanup of all acquired engines.
+        A failed repository is closed, not reusable.
         """
 
         try:
@@ -64,12 +65,18 @@ class GuardrailsRepository:
                 for config_id, path in self._config_paths.items():
                     config = await asyncio.to_thread(RailsConfig.from_path, str(path))
                     rails = Guardrails(config=config, require_iorails=True)
-                    await rails.startup()
                     self._checkers[config_id] = LegacyGuardrailsChecker(rails)
+                    await rails.startup()
                 self._ready = True
         except BaseException:
             await self.close()
             raise
+
+    @property
+    def has_pending_cleanup(self) -> bool:
+        """Report retained engines after an incomplete close attempt."""
+
+        return self._closed and bool(self._checkers)
 
     def get(self, config_id: str) -> ContentChecker:
         """Look up a preloaded checker without I/O or request-time initialization."""

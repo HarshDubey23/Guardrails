@@ -36,6 +36,14 @@ HttpTransportFactory = Callable[[], httpx.AsyncBaseTransport]
 
 @asynccontextmanager
 async def _lifespan(application: FastAPI):
+    """Publish only ready runtimes and retain unfinished Rails cleanup."""
+
+    pending = getattr(application.state, "proxy_cleanup_runtime", None)
+    if pending is not None:
+        await pending.close()
+        if pending.content_checkers.has_pending_cleanup:
+            raise RuntimeError("Previous Guardrails cleanup is incomplete.")
+        del application.state.proxy_cleanup_runtime
     factory = application.state.proxy_http_transport_factory
     transport = factory() if factory is not None else None
     if factory is not None and not isinstance(transport, httpx.AsyncBaseTransport):
@@ -55,9 +63,12 @@ async def _lifespan(application: FastAPI):
         application.state.proxy_runtime = runtime
         yield
     finally:
+        application.state.proxy_cleanup_runtime = runtime
         try:
             await runtime.close()
         finally:
+            if not runtime.content_checkers.has_pending_cleanup:
+                del application.state.proxy_cleanup_runtime
             if getattr(application.state, "proxy_runtime", None) is runtime:
                 del application.state.proxy_runtime
 
