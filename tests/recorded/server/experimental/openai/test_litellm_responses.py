@@ -21,33 +21,30 @@ mandatory offline replay, where bound-policy and passthrough assertions run.
 """
 
 import json
-from contextlib import asynccontextmanager
+from functools import partial
 
 import httpx
 import pytest
-from fastapi import FastAPI
 from jsonschema import Draft202012Validator
 
 from nemoguardrails.server.experimental._content_checker import (
     ContentAllowed,
+    ContentBlocked,
     ContentInspectionPolicy,
     StreamBufferingPolicy,
 )
-from nemoguardrails.server.experimental._guarded_proxy import create_guarded_http_operation
-from nemoguardrails.server.experimental._http_kernel import create_http_proxy_router
-from nemoguardrails.server.experimental._provider_transport import ProviderTransport
 from nemoguardrails.server.experimental.provider.contract_export import export_guard_contract
-from nemoguardrails.server.experimental.provider.integration import UpstreamSettings
 from nemoguardrails.server.experimental.provider.sse import iter_sse_events
 from nemoguardrails.server.experimental.provider.stream import StreamEventRole
 from nemoguardrails.server.experimental.providers.openai.dialects.litellm.responses import LITELLM_RESPONSES_ENDPOINT
-from nemoguardrails.server.experimental.providers.openai.errors import OPENAI_ERROR_MAPPING
 from nemoguardrails.server.experimental.providers.openai.responses.endpoint import RESPONSES_ENDPOINT
 from tests.recorded.cassette import cassette_request_jsons
+from tests.server.experimental.checkers import StaticChecker
+from tests.server.experimental.responses_proxy import responses_proxy
 
 pytestmark = [
     pytest.mark.recorded,
-    pytest.mark.vcr(ignore_hosts=["recorded-proxy.test"], allow_playback_repeats=True),
+    pytest.mark.vcr(ignore_hosts=["recorded-responses.test"]),
     pytest.mark.asyncio,
 ]
 
@@ -55,6 +52,7 @@ BASE_URL = "https://inference-api.nvidia.com/v1"
 MODEL = "openai/openai/gpt-5-nano"
 INPUT = "Reply with exactly: Hello."
 ENDPOINT = LITELLM_RESPONSES_ENDPOINT
+proxy = partial(responses_proxy, endpoint=ENDPOINT, base_url=BASE_URL)
 
 
 def responses_request(stream, *, model=MODEL):
@@ -66,60 +64,6 @@ def responses_request(stream, *, model=MODEL):
         "max_output_tokens": 256,
         "reasoning": {"effort": "minimal"},
     }
-
-
-class Checker:
-    def __init__(self):
-        self.calls = []
-
-    def inspection_policy(self):
-        return ContentInspectionPolicy(True, True, StreamBufferingPolicy(1, 0))
-
-    async def check_input(self, check):
-        self.calls.append(("input", check.message.content))
-        return ContentAllowed()
-
-    async def check_output(self, check):
-        self.calls.append(("output", check.output_content))
-        return ContentAllowed()
-
-
-@asynccontextmanager
-async def proxy(api_key, checker, dispatches):
-    async with httpx.AsyncClient(timeout=60) as upstream:
-        transport = ProviderTransport(UpstreamSettings(base_url=BASE_URL, mount_path="/v1"), upstream)
-
-        async def buffered(request):
-            dispatches.append(request)
-            return await transport.dispatch(request, require_identity_response=True)
-
-        async def streaming(request):
-            dispatches.append(request)
-            return await transport.stream_dispatch(request, require_identity_response=True)
-
-        app = FastAPI()
-        app.include_router(
-            create_http_proxy_router(
-                operations=(
-                    create_guarded_http_operation(
-                        ENDPOINT,
-                        OPENAI_ERROR_MAPPING,
-                        stream_dispatch=streaming,
-                        max_stream_event_bytes=1024 * 1024,
-                        max_pending_stream_bytes=1024 * 1024,
-                    ),
-                ),
-                checker=checker,
-                dispatch=buffered,
-                render_outcome=OPENAI_ERROR_MAPPING.renderer,
-            )
-        )
-        async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app),
-            base_url="http://recorded-proxy.test",
-            headers={"authorization": f"Bearer {api_key}"},
-        ) as client:
-            yield client
 
 
 async def capture(api_key, request):
@@ -145,14 +89,7 @@ async def validate_inventory(upstream, request):
     Draft202012Validator(document["request"]).validate(request)
     if not request["stream"]:
         payload = upstream.json()
-        assert payload.keys() - base_document["response"]["properties"].keys() == {
-            "access_programs",
-            "billing",
-            "frequency_penalty",
-            "presence_penalty",
-            "store",
-            "tool_usage",
-        }
+        assert payload.keys() <= base_document["response"]["properties"].keys()
         assert payload["access_programs"] is None
         assert payload["billing"] == {"payer": "developer"}
         assert payload["store"] is False
@@ -174,12 +111,7 @@ async def validate_inventory(upstream, request):
             assert payload["model"] == MODEL
             assert "provider_specific_fields" not in payload
             if "response" in payload:
-                assert payload["response"].keys() - base_document["response"]["properties"].keys() == {
-                    "frequency_penalty",
-                    "presence_penalty",
-                    "store",
-                    "tool_usage",
-                }
+                assert payload["response"].keys() <= base_document["response"]["properties"].keys()
             kinds.append(payload["type"])
         classified = adapter.classify_event(event)
         if classified.role is StreamEventRole.GUARDED_TEXT:
@@ -203,24 +135,86 @@ async def validate_inventory(upstream, request):
 
 @pytest.mark.parametrize("stream", [False, True], ids=["buffered", "streaming"])
 async def test_gateway_responses_preserve_policy_and_wire(
-    nvidia_inference_key, record_mode, recorded_cassette_path, stream
+    nvidia_inference_key, record_mode, recorded_cassette_path, vcr, stream
 ):
     request = responses_request(stream)
     upstream = await capture(nvidia_inference_key, request)
     assert upstream.status_code == 200
     if record_mode != "none":
+        assert len(vcr.requests) == 1
         return
+
+    assert vcr.play_count == 1
+    assert vcr.all_played
 
     assert cassette_request_jsons(recorded_cassette_path) == [request]
     text = await validate_inventory(upstream, request)
     assert text
-    checker = Checker()
+    for inspected in (True, False):
+        vcr.rewind()
+        checker = StaticChecker(
+            ContentInspectionPolicy(inspected, inspected, StreamBufferingPolicy(1, 0) if inspected else None)
+        )
+        dispatches = []
+        async with proxy(nvidia_inference_key, checker, dispatches) as client:
+            response = await client.post("/v1/responses", json=request)
+        assert response.status_code == upstream.status_code
+        assert response.content == upstream.content
+        assert response.headers["content-type"] == upstream.headers["content-type"]
+        assert len(dispatches) == len(vcr.requests) == vcr.play_count == 1
+        assert vcr.all_played
+        assert json.loads(dispatches[0].body) == request
+        if inspected:
+            assert checker.text_calls[0] == ("input", INPUT)
+            assert "".join(value for kind, value in checker.text_calls if kind == "output") == text
+        else:
+            assert checker.calls == []
+
+
+@pytest.mark.vcr("test_gateway_responses_preserve_policy_and_wire[buffered].yaml", record_mode="none")
+async def test_gateway_recorded_buffered_block_withholds_output(nvidia_inference_key, vcr):
+    checker = StaticChecker(ContentInspectionPolicy(True, True), output_decisions=[ContentBlocked("blocked by test")])
     dispatches = []
     async with proxy(nvidia_inference_key, checker, dispatches) as client:
-        response = await client.post("/v1/responses", json=request)
-    assert response.status_code == upstream.status_code
-    assert response.content == upstream.content
-    assert len(dispatches) == 1
-    assert json.loads(dispatches[0].body) == request
-    assert checker.calls[0] == ("input", INPUT)
-    assert "".join(value for kind, value in checker.calls if kind == "output") == text
+        response = await client.post("/v1/responses", json=responses_request(False))
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "content_blocked"
+    assert len(dispatches) == len(vcr.requests) == vcr.play_count == 1
+    assert vcr.all_played
+    assert checker.text_calls[0] == ("input", INPUT)
+    assert checker.text_calls[1][0] == "output"
+    assert checker.text_calls[1][1] not in response.text
+
+
+@pytest.mark.vcr("test_gateway_responses_preserve_policy_and_wire[streaming].yaml", record_mode="none")
+@pytest.mark.parametrize("allowed_windows", [0, 1], ids=["first-window", "later-window"])
+async def test_gateway_recorded_stream_releases_only_approved_prefix(nvidia_inference_key, vcr, allowed_windows):
+    upstream = await capture(nvidia_inference_key, responses_request(True))
+    recorded_events = await events(upstream.content)
+    deltas = [
+        (index, payload["delta"])
+        for index, event in enumerate(recorded_events)
+        if event.data not in (None, b"[DONE]")
+        and (payload := json.loads(event.data))["type"] == "response.output_text.delta"
+        and payload["delta"]
+    ]
+    assert len(deltas) > allowed_windows
+    released_end = deltas[allowed_windows - 1][0] + 1 if allowed_windows else 0
+    assert vcr.play_count == 1
+    vcr.rewind()
+    checker = StaticChecker(
+        ContentInspectionPolicy(True, True, StreamBufferingPolicy(1, 0)),
+        output_decisions=[ContentAllowed()] * allowed_windows + [ContentBlocked("blocked by test")],
+    )
+    dispatches = []
+    async with proxy(nvidia_inference_key, checker, dispatches) as client:
+        response = await client.post("/v1/responses", json=responses_request(True))
+    assert response.status_code == 200
+    received = await events(response.content)
+    assert [event.raw for event in received[:-1]] == [event.raw for event in recorded_events[:released_end]]
+    assert received[-1].event_type == b"error"
+    assert json.loads(received[-1].data)["code"] == "content_blocked"
+    assert b"[DONE]" not in response.content
+    assert checker.text_calls == [("input", INPUT)] + [("output", text) for _, text in deltas[: allowed_windows + 1]]
+    assert len(dispatches) == len(vcr.requests) == vcr.play_count == 1
+    assert vcr.all_played

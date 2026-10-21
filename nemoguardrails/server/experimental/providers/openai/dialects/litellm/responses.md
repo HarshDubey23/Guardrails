@@ -10,7 +10,7 @@ package, new transport, new kernel, or alternate lifecycle hooks are required.
 | Location | Decision |
 | --- | --- |
 | Request | Reuse the strict Responses binding unchanged: one string input, foreground generation, no tools, conversation history, or additional plaintext instructions. |
-| Buffered response and lifecycle `response` snapshots | Recognize optional `access_programs`, `billing`, `frequency_penalty`, `presence_penalty`, `store`, and `tool_usage` as opaque metadata. |
+| Buffered response and lifecycle `response` snapshots | Reuse the native response policy, including opaque `access_programs`, `billing`, `frequency_penalty`, `presence_penalty`, `store`, and `tool_usage` metadata. |
 | Root of each reviewed SSE event | Recognize optional `model` as opaque metadata, never as an event selector or text source. |
 | Output items, content parts, delta text, annotations, logprobs, reasoning summaries | Inherit the existing constrained/guarded policy unchanged. No Chat-specific `provider_specific_fields` bags are added. |
 | Event selection and lifecycle | Retain all 15 existing event rules, derived paths/coverage, native terminal requirements, identity checks, snapshot consistency, and error framing. |
@@ -21,10 +21,10 @@ permission to emit tool calls. The actual output items still reject tool content
 Allowing `store` in the response does not introduce a new request control: it was
 already reviewed in the base request declaration.
 
-These names describe the reviewed **gateway surface**, not fields all invented
-by LiteLLM. For example, `access_programs` appears in the
-[native OpenAI response reference](https://developers.openai.com/api/reference/resources/responses/methods/create).
-This change does not broaden the strict endpoint's pinned field inventory.
+Native OpenAI recordings also contain all six response metadata names. They
+belong to the base Responses policy; the dialect adds only the root SSE `model`
+annotation. Buffered response and nested lifecycle response declarations are
+shared with the base endpoint.
 Unknown root members, new events and unsupported content still fail closed.
 The base profile's trusted nested unknown-field override remains unchanged.
 
@@ -76,7 +76,7 @@ Two genuine cassettes live in
 `tests/recorded/server/experimental/openai/cassettes/test_litellm_responses/`.
 They capture `openai/openai/gpt-5-nano` through NVIDIA's inference gateway, with a
 harmless greeting, `store: false`, and a 256-token output limit. Buffered evidence
-includes all six metadata additions. Streaming evidence includes the model
+includes all six shared metadata fields. Streaming evidence includes the model
 annotation and initial/final snapshots, reasoning-item metadata, assistant-item
 snapshots, content-part snapshots and text deltas/done. No new event type or Chat
 extension bag was observed. They are evidence for this route, not raw vLLM or
@@ -116,6 +116,10 @@ uv run --locked python -m nemoguardrails.server.experimental.provider.contract_e
 Capture consumes the entire upstream response before policy assertions. Mandatory
 offline replay then checks the actual endpoint, export, text extraction, terminal
 behavior and passthrough bytes. A successful capture alone is not compatibility
-validation. Dialect rejection cases use synthetic unit fixtures; generic blocking,
-cancellation and malformed-stream tests remain with the existing Responses stack.
+validation. Each replay pass consumes exactly one interaction, with explicit rewinds between
+direct, inspected, and uninspected comparisons. Successful cassettes also cover
+buffered blocking and first/later streaming-window blocking with synthetic
+checker verdicts, forced to replay even during refresh. Dialect rejection cases
+use synthetic unit fixtures; cancellation and malformed-stream tests remain
+with the existing Responses stack.
 The exported YAML describes the effective declarations and is not a runtime input.

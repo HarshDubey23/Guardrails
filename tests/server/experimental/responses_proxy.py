@@ -27,11 +27,17 @@ from nemoguardrails.server.experimental.providers.openai.responses.endpoint impo
 
 
 @asynccontextmanager
-async def responses_proxy(api_key, checker, dispatches, *, http_transport=None):
+async def responses_proxy(
+    api_key,
+    checker,
+    dispatches,
+    *,
+    http_transport=None,
+    endpoint=RESPONSES_ENDPOINT,
+    base_url="https://api.openai.com/v1",
+):
     async with httpx.AsyncClient(timeout=60, transport=http_transport) as upstream:
-        transport = ProviderTransport(
-            UpstreamSettings(base_url="https://api.openai.com/v1", mount_path="/v1"), upstream
-        )
+        transport = ProviderTransport(UpstreamSettings(base_url=base_url, mount_path="/v1"), upstream)
 
         async def buffered(request):
             dispatches.append(request)
@@ -46,7 +52,7 @@ async def responses_proxy(api_key, checker, dispatches, *, http_transport=None):
             create_http_proxy_router(
                 operations=(
                     create_guarded_http_operation(
-                        RESPONSES_ENDPOINT,
+                        endpoint,
                         OPENAI_ERROR_MAPPING,
                         stream_dispatch=streaming,
                         max_stream_event_bytes=1024 * 1024,

@@ -31,7 +31,6 @@ from nemoguardrails.server.experimental.provider.stream import UnsupportedProvid
 from nemoguardrails.server.experimental.providers.openai.dialects.litellm.responses import (
     LITELLM_RESPONSES_ENDPOINT,
     STREAM_RULES,
-    LiteLLMLifecycleResponse,
 )
 from nemoguardrails.server.experimental.providers.openai.responses.endpoint import RESPONSES_ENDPOINT
 from nemoguardrails.server.experimental.providers.openai.responses.stream_classifier import STREAM_RULES as BASE_RULES
@@ -50,6 +49,7 @@ METADATA = {
 
 def test_dialect_is_explicit_and_reuses_request_policy_and_lifecycle_hooks():
     endpoint = LITELLM_RESPONSES_ENDPOINT
+    assert endpoint.guarded_response_model is RESPONSES_ENDPOINT.guarded_response_model
     assert endpoint.guarded_request_model is RESPONSES_ENDPOINT.guarded_request_model
     assert endpoint.stream.hooks_factory is RESPONSES_ENDPOINT.stream.hooks_factory
     assert endpoint.operation_paths == RESPONSES_ENDPOINT.operation_paths
@@ -60,15 +60,13 @@ def test_dialect_is_explicit_and_reuses_request_policy_and_lifecycle_hooks():
 
 
 @pytest.mark.parametrize("name,value", METADATA.items())
-def test_reviewed_metadata_is_response_only_and_preserves_the_original_payload(name, value):
+def test_native_metadata_is_shared_and_preserves_the_original_payload(name, value):
     payload = {**response_payload(), name: value}
     original = deepcopy(payload)
-    with pytest.raises(ValidationError):
-        RESPONSES_ENDPOINT.guarded_response_model.validate_payload(payload)
+    RESPONSES_ENDPOINT.guarded_response_model.validate_payload(payload)
     projection = LITELLM_RESPONSES_ENDPOINT.guarded_response_model.validate_payload(payload)
     assert projection.locate_guarded_message(payload).message.content == "answer"
     assert payload == original
-    LiteLLMLifecycleResponse.model_validate(payload)
     exported = export_guard_contract(LITELLM_RESPONSES_ENDPOINT)
     assert exported["response"]["properties"][name][EXTENSION]["classification"] == "opaque"
     Draft202012Validator(exported["response"]).validate(payload)
