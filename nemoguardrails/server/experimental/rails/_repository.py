@@ -22,7 +22,7 @@ from collections.abc import Sequence
 import anyio
 
 from nemoguardrails import Guardrails, RailsConfig
-from nemoguardrails.server.experimental._content_checker import ContentChecker
+from nemoguardrails.server.experimental._content_checker import ContentChecker, validate_content_checker
 from nemoguardrails.server.experimental.rails._adapter import LegacyGuardrailsChecker
 from nemoguardrails.server.experimental.rails.config import ConfigEntry, validate_config_entries
 
@@ -66,6 +66,7 @@ class GuardrailsRepository:
                     config = await asyncio.to_thread(RailsConfig.from_path, str(path))
                     rails = Guardrails(config=config, require_iorails=True)
                     self._checkers[config_id] = LegacyGuardrailsChecker(rails)
+                    validate_content_checker(self._checkers[config_id])
                     await rails.startup()
                 self._ready = True
         except BaseException:

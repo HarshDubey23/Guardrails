@@ -118,10 +118,16 @@ owned by the application without publishing a ready runtime. A subsequent
 application lifespan retries that cleanup and constructs a fresh catalog only
 after it succeeds; otherwise startup is rejected again.
 
+Preloading validates each adapter's inspection policy before starting its engine.
+Unsupported retrieval or tool rails, including per-tool declarations, prevent
+readiness even when the resolver would never select that configuration. Any
+previously started engines and the rejected engine remain owned for cleanup.
+
 Preloading trades longer startup and resources for potentially unused configs
 for fail-fast initialization and predictable request latency. Resolver errors
-and operation-specific capability checks remain request-time concerns; loading
-a configuration does not prove it supports every endpoint or streaming mode.
+and operation-specific capability checks remain request-time concerns; a valid
+inspection policy does not prove compatibility with every endpoint or streaming
+mode. Request-time validation remains in place as a defensive check.
 
 Configuration file loading and parsing run in a worker thread, so filesystem
 work does not block the event loop. Engine construction and startup remain on

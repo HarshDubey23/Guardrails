@@ -20,12 +20,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import anyio
 import httpx
 import pytest
+import yaml
 
 from nemoguardrails import Guardrails, RailsConfig
 from nemoguardrails.guardrails.iorails import IORails
 from nemoguardrails.http.transport import HttpxHTTPClient
 from nemoguardrails.server.experimental import _runtime, rails
 from nemoguardrails.server.experimental._application import create_proxy_application
+from nemoguardrails.server.experimental._content_checker import UnsupportedContentCheckerConfiguration
 from nemoguardrails.server.experimental._runtime import ServerRuntime
 from nemoguardrails.server.experimental.providers.openai.integration import create_openai_chat_integration
 from nemoguardrails.server.experimental.rails import ConfigEntry, _repository
@@ -75,12 +77,67 @@ async def test_application_preloads_even_unselected_configs_before_readiness(tmp
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "rail_type,section",
+    [("retrieval", {"flows": ["check retrieval"]})]
+    + [
+        (rail_type, section)
+        for rail_type in ("tool_call", "tool_result", "tool_input", "tool_output")
+        for section in ({"flows": ["check tool"]}, {"per_tool": {"lookup": ["check tool"]}})
+    ],
+)
+async def test_unsupported_unselected_policy_prevents_readiness_and_closes_owners(
+    tmp_path, monkeypatch, rail_type, section
+):
+    selected_path = config_path(tmp_path / "selected")
+    unsupported_path = config_path(tmp_path / "unsupported")
+    (unsupported_path / "config.yml").write_text(
+        yaml.safe_dump({"models": [], "rails": {rail_type: section}}), encoding="utf-8"
+    )
+    engines = []
+
+    def create_engine(*, config, require_iorails):
+        assert isinstance(config, RailsConfig)
+        instance = MagicMock(config=config, startup=AsyncMock(), shutdown=AsyncMock())
+        engines.append(instance)
+        return instance
+
+    monkeypatch.setattr(_repository, "Guardrails", create_engine)
+    transport = httpx.MockTransport(lambda _request: pytest.fail("no dispatch expected"))
+    transport.aclose = AsyncMock()
+    application = create_proxy_application(
+        providers=(create_openai_chat_integration(),),
+        rails_configs=(ConfigEntry("selected", selected_path), ConfigEntry("unsupported", unsupported_path)),
+        config_resolver=lambda _context: "selected",
+        http_transport_factory=lambda: transport,
+    )
+
+    with pytest.raises(UnsupportedContentCheckerConfiguration):
+        async with application.router.lifespan_context(application):
+            pytest.fail("an unsupported catalog entry must prevent readiness")
+
+    assert not hasattr(application.state, "proxy_runtime")
+    assert not hasattr(application.state, "proxy_cleanup_runtime")
+    engines[0].startup.assert_awaited_once()
+    engines[1].startup.assert_not_awaited()
+    for engine in engines:
+        engine.shutdown.assert_awaited_once()
+    transport.aclose.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("failure_at", ["parse", "construct", "startup", "cancel"])
 async def test_application_startup_failure_rolls_back_catalog_and_http(tmp_path, monkeypatch, failure_at):
     path = config_path(tmp_path)
-    first = MagicMock(startup=AsyncMock(), shutdown=AsyncMock())
+    first = MagicMock(
+        config=RailsConfig.from_content(yaml_content="models: []"), startup=AsyncMock(), shutdown=AsyncMock()
+    )
     failure = asyncio.CancelledError() if failure_at == "cancel" else ValueError("invalid config")
-    second = MagicMock(startup=AsyncMock(side_effect=failure), shutdown=AsyncMock())
+    second = MagicMock(
+        config=RailsConfig.from_content(yaml_content="models: []"),
+        startup=AsyncMock(side_effect=failure),
+        shutdown=AsyncMock(),
+    )
     factory = MagicMock(side_effect=[first, failure if failure_at == "construct" else second])
     monkeypatch.setattr(_repository, "Guardrails", factory)
     if failure_at == "parse":
@@ -119,7 +176,9 @@ async def test_file_loading_does_not_block_the_event_loop(tmp_path, monkeypatch)
         finished.set()
         return config
 
-    instance = MagicMock(startup=AsyncMock(), shutdown=AsyncMock())
+    instance = MagicMock(
+        config=RailsConfig.from_content(yaml_content="models: []"), startup=AsyncMock(), shutdown=AsyncMock()
+    )
     monkeypatch.setattr(_repository.RailsConfig, "from_path", read_config)
     monkeypatch.setattr(_repository, "Guardrails", MagicMock(return_value=instance))
     repository = GuardrailsRepository((ConfigEntry("policy", config_path(tmp_path)),))
@@ -142,8 +201,14 @@ async def test_lookup_requires_the_whole_catalog_to_finish_startup(tmp_path, mon
         entered.set()
         await release.wait()
 
-    first = MagicMock(startup=AsyncMock(), shutdown=AsyncMock())
-    second = MagicMock(startup=AsyncMock(side_effect=startup), shutdown=AsyncMock())
+    first = MagicMock(
+        config=RailsConfig.from_content(yaml_content="models: []"), startup=AsyncMock(), shutdown=AsyncMock()
+    )
+    second = MagicMock(
+        config=RailsConfig.from_content(yaml_content="models: []"),
+        startup=AsyncMock(side_effect=startup),
+        shutdown=AsyncMock(),
+    )
     monkeypatch.setattr(_repository, "Guardrails", MagicMock(side_effect=[first, second]))
     path = config_path(tmp_path)
     repository = GuardrailsRepository((ConfigEntry("first", path), ConfigEntry("second", path)))
@@ -175,8 +240,14 @@ async def test_cancelled_startup_rolls_back_completed_engines_and_rejects_lookup
         finally:
             cancelled.set()
 
-    first = MagicMock(startup=AsyncMock(), shutdown=AsyncMock())
-    second = MagicMock(startup=AsyncMock(side_effect=startup), shutdown=AsyncMock())
+    first = MagicMock(
+        config=RailsConfig.from_content(yaml_content="models: []"), startup=AsyncMock(), shutdown=AsyncMock()
+    )
+    second = MagicMock(
+        config=RailsConfig.from_content(yaml_content="models: []"),
+        startup=AsyncMock(side_effect=startup),
+        shutdown=AsyncMock(),
+    )
     monkeypatch.setattr(_repository, "Guardrails", MagicMock(side_effect=[first, second]))
     path = config_path(tmp_path)
     repository = GuardrailsRepository((ConfigEntry("first", path), ConfigEntry("second", path)))
@@ -207,8 +278,14 @@ async def test_shutdown_attempts_all_checkers_and_allows_failed_cleanup_retry(tm
             await asyncio.Event().wait()
         raise RuntimeError("private cleanup detail")
 
-    first = MagicMock(startup=AsyncMock(), shutdown=AsyncMock(side_effect=fail))
-    second = MagicMock(startup=AsyncMock(), shutdown=AsyncMock())
+    first = MagicMock(
+        config=RailsConfig.from_content(yaml_content="models: []"),
+        startup=AsyncMock(),
+        shutdown=AsyncMock(side_effect=fail),
+    )
+    second = MagicMock(
+        config=RailsConfig.from_content(yaml_content="models: []"), startup=AsyncMock(), shutdown=AsyncMock()
+    )
     monkeypatch.setattr(_repository, "Guardrails", MagicMock(side_effect=[first, second]))
     path = config_path(tmp_path)
     repository = GuardrailsRepository((ConfigEntry("first", path), ConfigEntry("second", path)))
@@ -233,7 +310,11 @@ async def test_shutdown_is_shielded_and_concurrent_closes_do_not_duplicate_clean
     async def shutdown():
         await anyio.lowlevel.checkpoint()
 
-    instance = MagicMock(startup=AsyncMock(), shutdown=AsyncMock(side_effect=shutdown))
+    instance = MagicMock(
+        config=RailsConfig.from_content(yaml_content="models: []"),
+        startup=AsyncMock(),
+        shutdown=AsyncMock(side_effect=shutdown),
+    )
     monkeypatch.setattr(_repository, "Guardrails", MagicMock(return_value=instance))
     repository = GuardrailsRepository((ConfigEntry("policy", config_path(tmp_path)),))
     await repository.startup()
@@ -299,7 +380,11 @@ async def test_http_client_closes_even_when_checker_shutdown_times_out(tmp_path,
     async def shutdown():
         await asyncio.Event().wait()
 
-    instance = MagicMock(startup=AsyncMock(), shutdown=AsyncMock(side_effect=shutdown))
+    instance = MagicMock(
+        config=RailsConfig.from_content(yaml_content="models: []"),
+        startup=AsyncMock(),
+        shutdown=AsyncMock(side_effect=shutdown),
+    )
     monkeypatch.setattr(_repository, "Guardrails", MagicMock(return_value=instance))
     runtime = ServerRuntime.create((ConfigEntry("policy", config_path(tmp_path)),), None)
     await runtime.content_checkers.startup()
@@ -337,7 +422,7 @@ async def test_http_shutdown_is_bounded_and_preserves_primary_failure(monkeypatc
 
 def config_path(tmp_path):
     path = tmp_path / "rails"
-    path.mkdir(exist_ok=True)
+    path.mkdir(parents=True, exist_ok=True)
     (path / "config.yml").write_text("models: []\n", encoding="utf-8")
     return path
 
@@ -351,13 +436,16 @@ def test_rails_api_exports_only_config_resolution_types():
 
 @pytest.mark.asyncio
 async def test_repository_caches_and_closes_guardrails_by_config_id(tmp_path):
-    guardrails = MagicMock()
+    guardrails = MagicMock(config=RailsConfig.from_content(yaml_content="models: []"))
     guardrails.startup = AsyncMock()
     guardrails.shutdown = AsyncMock()
     repository = GuardrailsRepository((ConfigEntry("content-safety", config_path(tmp_path)),))
 
     with (
-        patch("nemoguardrails.server.experimental.rails._repository.RailsConfig.from_path", return_value=MagicMock()),
+        patch(
+            "nemoguardrails.server.experimental.rails._repository.RailsConfig.from_path",
+            return_value=RailsConfig.from_content(yaml_content="models: []"),
+        ),
         patch(
             "nemoguardrails.server.experimental.rails._repository.Guardrails",
             return_value=guardrails,
@@ -378,14 +466,17 @@ async def test_repository_caches_and_closes_guardrails_by_config_id(tmp_path):
 @pytest.mark.asyncio
 async def test_repository_does_not_share_cores_between_config_ids(tmp_path):
     path = config_path(tmp_path)
-    guardrails = [MagicMock(), MagicMock()]
+    guardrails = [MagicMock(config=RailsConfig.from_content(yaml_content="models: []")) for _ in range(2)]
     for instance in guardrails:
         instance.startup = AsyncMock()
         instance.shutdown = AsyncMock()
     repository = GuardrailsRepository((ConfigEntry("tenant-a", path), ConfigEntry("tenant-b", path)))
 
     with (
-        patch("nemoguardrails.server.experimental.rails._repository.RailsConfig.from_path", return_value=MagicMock()),
+        patch(
+            "nemoguardrails.server.experimental.rails._repository.RailsConfig.from_path",
+            return_value=RailsConfig.from_content(yaml_content="models: []"),
+        ),
         patch("nemoguardrails.server.experimental.rails._repository.Guardrails", side_effect=guardrails),
     ):
         await repository.startup()
@@ -400,12 +491,15 @@ async def test_repository_does_not_share_cores_between_config_ids(tmp_path):
 
 @pytest.mark.asyncio
 async def test_repository_cannot_restart_after_startup_failure(tmp_path):
-    guardrails = MagicMock()
+    guardrails = MagicMock(config=RailsConfig.from_content(yaml_content="models: []"))
     guardrails.startup = AsyncMock(side_effect=RuntimeError("broken config"))
     repository = GuardrailsRepository((ConfigEntry("broken", config_path(tmp_path)),))
 
     with (
-        patch("nemoguardrails.server.experimental.rails._repository.RailsConfig.from_path", return_value=MagicMock()),
+        patch(
+            "nemoguardrails.server.experimental.rails._repository.RailsConfig.from_path",
+            return_value=RailsConfig.from_content(yaml_content="models: []"),
+        ),
         patch("nemoguardrails.server.experimental.rails._repository.Guardrails", return_value=guardrails),
     ):
         with pytest.raises(RuntimeError, match="broken config"):
