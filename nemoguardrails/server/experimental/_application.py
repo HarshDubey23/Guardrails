@@ -47,7 +47,7 @@ async def _lifespan(application: FastAPI):
     pending = getattr(application.state, "proxy_cleanup_runtime", None)
     if pending is not None:
         await pending.close()
-        if pending.content_checkers.has_pending_cleanup:
+        if pending.has_pending_cleanup:
             raise RuntimeError("Previous Guardrails cleanup is incomplete.")
         del application.state.proxy_cleanup_runtime
     factory = application.state.proxy_http_transport_factory
@@ -66,7 +66,7 @@ async def _lifespan(application: FastAPI):
             await _close_http_resource(transport)
         raise
     try:
-        await runtime.content_checkers.startup()
+        await runtime.startup()
         application.state.proxy_runtime = runtime
         yield
     finally:
@@ -74,7 +74,7 @@ async def _lifespan(application: FastAPI):
         try:
             await runtime.close()
         finally:
-            if not runtime.content_checkers.has_pending_cleanup:
+            if not runtime.has_pending_cleanup:
                 del application.state.proxy_cleanup_runtime
             if getattr(application.state, "proxy_runtime", None) is runtime:
                 del application.state.proxy_runtime

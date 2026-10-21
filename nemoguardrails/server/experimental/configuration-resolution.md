@@ -148,8 +148,14 @@ work does not block the event loop. Engine construction and startup remain on
 the application loop, before serving; arbitrary engine constructors are not
 assumed to be thread-safe or non-blocking.
 
-The application runtime closes the checker repository and the shared outbound
-HTTP client. Shutdown rejects new checker lookups and independently attempts
+The application lifespan starts, publishes, and closes `ServerRuntime`. The
+runtime owns checker initialization and exposes whether engine cleanup remains
+pending, so the lifespan does not inspect repository internals. Publication
+still waits for the entire catalog; a pending runtime stays owned by the
+application until a subsequent cleanup attempt completes.
+
+The runtime closes the checker repository and the shared outbound HTTP client.
+Shutdown rejects new checker lookups and independently attempts
 every loaded checker's cleanup. Each checker gets a
 shielded five-second cooperative budget; timeouts and ordinary failures are
 logged without replacing the application's primary error. Incomplete checker

@@ -374,6 +374,45 @@ async def test_repository_retries_real_core_shutdown_after_queue_timeout(tmp_pat
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["hang", "raise"])
+async def test_runtime_retains_cleanup_status_until_engine_retry_succeeds(tmp_path, monkeypatch, failure):
+    monkeypatch.setattr(_repository, "_SHUTDOWN_TIMEOUT_SECONDS", 0.01)
+
+    async def fail_shutdown():
+        if failure == "hang":
+            await asyncio.Event().wait()
+        raise RuntimeError("cleanup failed")
+
+    engine = MagicMock(
+        config=RailsConfig.from_content(yaml_content="models: []"),
+        startup=AsyncMock(),
+        shutdown=AsyncMock(side_effect=fail_shutdown),
+    )
+    monkeypatch.setattr(_repository, "Guardrails", MagicMock(return_value=engine))
+    runtime = ServerRuntime.create((ConfigEntry("policy", config_path(tmp_path)),), None)
+
+    try:
+        assert not runtime.has_pending_cleanup
+        await runtime.startup()
+        engine.startup.assert_awaited_once()
+        assert not runtime.has_pending_cleanup
+        with anyio.fail_after(1):
+            await runtime.close()
+        assert runtime.has_pending_cleanup
+        assert runtime.http_client.is_closed
+
+        engine.shutdown.side_effect = None
+        await runtime.close()
+        assert not runtime.has_pending_cleanup
+        assert engine.shutdown.await_count == 2
+        await runtime.close()
+        assert engine.shutdown.await_count == 2
+    finally:
+        engine.shutdown.side_effect = None
+        await runtime.close()
+
+
+@pytest.mark.asyncio
 async def test_http_client_closes_even_when_checker_shutdown_times_out(tmp_path, monkeypatch):
     monkeypatch.setattr(_repository, "_SHUTDOWN_TIMEOUT_SECONDS", 0.01)
 

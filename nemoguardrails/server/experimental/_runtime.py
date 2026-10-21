@@ -92,6 +92,13 @@ class ServerRuntime:
             config_resolution_timeout=config_resolution_timeout,
         )
 
+    async def startup(self) -> None:
+        await self.content_checkers.startup()
+
+    @property
+    def has_pending_cleanup(self) -> bool:
+        return self.content_checkers.has_pending_cleanup
+
     async def resolve_content_checker(
         self,
         request: Request,
