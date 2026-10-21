@@ -98,6 +98,34 @@ before the resolver runs. A resolver that consults an authorization service,
 tenant registry, or session store must use asynchronous I/O with cancellation
 support and appropriate client timeouts.
 
+For example, an asynchronous resolver can look up the policy assigned to an
+authenticated tenant:
+
+```python
+async def resolve_config_async(context: ConfigContext) -> str:
+    subject = context.request.state.guardrails_subject
+    registry = context.request.app.state.policy_registry
+    return await registry.config_id_for(tenant_id=subject.tenant_id)
+
+
+application = create_proxy_application(
+    providers=providers,
+    rails_configs=configs,
+    config_resolver=resolve_config_async,
+    config_resolution_timeout=2.0,
+)
+application.state.policy_registry = policy_registry
+```
+
+Here, `policy_registry` is an application-supplied asynchronous client, whose
+startup, shutdown, and I/O timeouts are owned by the embedding application.
+Its `config_id_for()` method returns a declared ID such as `"standard"` or
+`"restricted"`. Attach the authentication middleware shown above to this
+application so `guardrails_subject` comes from authenticated identity. The proxy
+awaits the resolver and checks its result against `configs`; pass the function
+itself as `config_resolver`, without calling it during assembly. Exceptions and
+timeouts fail closed rather than selecting a fallback policy.
+
 `create_proxy_application(config_resolution_timeout=5.0, ...)` sets the resolver's
 cooperative deadline in seconds, independently of outbound provider timeouts.
 The default is five seconds; an override must be finite and positive. A timeout
