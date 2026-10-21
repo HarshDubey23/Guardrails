@@ -73,7 +73,7 @@ class LegacyGuardrailsChecker:
         rail_config = self._rails.config.rails
         unsupported = [
             rail_type
-            for rail_type in ("retrieval", "tool_input", "tool_output")
+            for rail_type in ("retrieval", "tool_call", "tool_result")
             if getattr(getattr(rail_config, rail_type, None), "flows", None)
             or any(getattr(getattr(rail_config, rail_type, None), "per_tool", {}).values())
         ]

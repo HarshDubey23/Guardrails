@@ -147,14 +147,20 @@ def test_unknown_resolved_config_fails_closed_before_upstream(tmp_path):
     assert transport.requests == []
 
 
-@pytest.mark.parametrize("rail_type", ["tool_input", "tool_output"])
+@pytest.mark.parametrize(
+    "rail_type,flow",
+    [
+        ("tool_call", "tool call validation"),
+        ("tool_result", "tool result validation"),
+        ("tool_output", "tool call validation"),
+        ("tool_input", "tool result validation"),
+    ],
+)
+@pytest.mark.parametrize("per_tool", [False, True], ids=["global", "per-tool"])
 @pytest.mark.parametrize("stream", [False, True], ids=["buffered", "streaming"])
-def test_per_tool_rails_fail_before_upstream(tmp_path, monkeypatch, rail_type, stream):
-    """Reject configured tool flows even when the global flow list is empty."""
-
-    config = RailsConfig.from_content(
-        config={"models": [], "rails": {rail_type: {"per_tool": {"unused": [], "lookup": ["tool check"]}}}}
-    )
+def test_tool_rails_fail_before_upstream(tmp_path, monkeypatch, rail_type, flow, per_tool, stream):
+    section = {"per_tool": {"unused": [], "lookup": [flow]}} if per_tool else {"flows": [flow]}
+    config = RailsConfig.from_content(config={"models": [], "rails": {rail_type: section}})
     resolved_checker = LegacyGuardrailsChecker(MagicMock(config=config))
     monkeypatch.setattr(GuardrailsRepository, "get", MagicMock(return_value=resolved_checker))
     transport = RecordingTransport()
@@ -191,7 +197,7 @@ def test_unsupported_resolved_checker_configuration_fails_before_upstream(tmp_pa
     assert transport.requests == []
 
 
-@pytest.mark.parametrize("rail_type", ["tool_input", "tool_output"])
+@pytest.mark.parametrize("rail_type", ["tool_call", "tool_result", "tool_input", "tool_output"])
 def test_empty_per_tool_flows_do_not_enable_unsupported_rails(rail_type):
     """Treat a tool entry without flows as unconfigured, as the core does."""
 
