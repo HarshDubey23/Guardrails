@@ -333,6 +333,7 @@ async def test_provider_valid_content_outside_profile_is_withheld(streaming, pat
 @pytest.mark.parametrize(
     "method,path",
     [
+        ("GET", "/v1/chat/completions"),
         ("GET", "/v1/chat/completions/chatcmpl-test"),
         ("POST", "/v1/chat/completions/chatcmpl-test"),
         ("DELETE", "/v1/chat/completions/chatcmpl-test"),
@@ -350,18 +351,8 @@ async def test_other_documented_chat_operations_relay_without_guarded_checks(met
     assert result.content == body
     assert len(requests) == 1
     assert requests[0].method == method
+    assert requests[0].url.path == path
     assert requests[0].url.query == b"opaque=keep"
     assert requests[0].content == b'{"metadata":{"purpose":"test"}}'
     assert checker.calls == []
     assert source.closed
-
-
-async def test_documented_list_operation_at_guarded_path_is_explicitly_reserved():
-    assert "get" in source_document()["paths"]["/chat/completions"]
-    checker = checker_for(True)
-    async with proxy(checker, b"must not be requested") as (client, requests, _):
-        response = await client.get("/v1/chat/completions")
-    assert_native_error(response, 405, "method_not_allowed")
-    assert response.headers["allow"] == "POST"
-    assert requests == []
-    assert checker.calls == []

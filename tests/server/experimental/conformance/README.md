@@ -38,11 +38,11 @@ value or combination coverage.
 
 ## Important limitations
 
-The router guards `POST /v1/chat/completions`. Other methods on that reserved
-path, including the documented list operation, return 405. The four documented
-item operations on `/v1/chat/completions/{id}` and its `/messages` child are
-relayed without guardrails. Their tests check transport preservation, not full
-provider-schema validation.
+The router guards `POST /v1/chat/completions`. The documented list operation,
+`GET /v1/chat/completions`, and the four documented item operations on
+`/v1/chat/completions/{id}` and its `/messages` child are relayed without
+guardrails. Their tests check transport preservation, not full provider-schema
+validation.
 
 The [pinned source](openai/chat_completions/fixtures/README.md) declares OpenAPI 3.1 but uses
 legacy `nullable` annotations, including beside enums and references.
