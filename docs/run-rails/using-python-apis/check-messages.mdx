@@ -202,6 +202,7 @@ The `RailsResult` object contains the outcome of the rails check.
 | `status` | `RailStatus` | `PASSED`, `MODIFIED`, or `BLOCKED` |
 | `content` | `str` | The final content after rails processing |
 | `rail` | `Optional[str]` | Name of the rail that blocked the content (only when `BLOCKED`) |
+| `failed` | `bool` | `True` when IORails reports a rail execution failure; the status remains `BLOCKED`. Defaults to `False`. LLMRails does not populate this flag. |
 | `reason` | `Optional[str]` | Why the rail blocked the content (IORails only; `None` on `LLMRails` and when not `BLOCKED`) |
 | `tool_violations` | `Optional[List[ToolViolation]]` | The tool calls or tool results a tool rail blocked (IORails only; `None` unless a tool rail blocked). Refer to [Tool Violations](#tool-violations) |
 
@@ -384,9 +385,14 @@ On `IORails`, a blocked check returns the engine's fixed refusal message, `I'm s
 That is the same string the built-in rails use by default, so an unmodified configuration produces the same text on both engines.
 
 `IORails` also distinguishes a policy block from a rail execution failure.
-When a rail fails to execute, the check returns `BLOCKED` with `I'm sorry, an internal error has occurred.` instead of the refusal message.
+When a rail fails to execute, the check returns `BLOCKED` with `failed=True` and `I'm sorry, an internal error has occurred.` instead of the refusal message.
 This distinction prevents the application from reporting an operational failure as a content refusal.
 That wording matches the sentence the Colang runtime produces on `LLMRails` when an action fails.
+
+Use `failed` to classify an IORails execution failure before handling an ordinary policy block.
+The status stays `BLOCKED`, so existing callers that stop on that status continue to stop on failures.
+LLMRails does not populate this flag: `failed=False` means no typed failure was reported, not that every legacy action succeeded.
+Existing serialized results without `failed` remain valid and default to `False`; newly serialized results include the field unless the caller excludes default values.
 
 On `IORails`, a blocked check also sets `reason`, which explains the block for logs and diagnostics.
 When a rail fails to execute, `reason` names the rail that failed.

@@ -265,6 +265,33 @@ def mock_rails():
 
 class TestCheckAsyncIntegration:
     @pytest.mark.asyncio
+    async def test_legacy_action_failure_does_not_set_typed_failure_flag(self):
+        config = RailsConfig.from_content(
+            colang_content="define flow broken input\n  $result = execute broken_check\n",
+            config={"models": [], "rails": {"input": {"flows": ["broken input"]}}},
+        )
+        rails = LLMRails(config)
+        calls = []
+
+        async def broken_check():
+            calls.append(True)
+            raise RuntimeError("internal-action-failure")
+
+        rails.register_action(broken_check, name="broken_check")
+        result = await rails.check_async([{"role": "user", "content": "hello"}])
+
+        assert calls == [True]
+        assert "internal error" in result.content
+        assert result.failed is False
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("content", ["hello", "block", "modify"])
+    async def test_legacy_results_do_not_report_typed_failures(self, mock_rails, content):
+        result = await mock_rails.check_async([{"role": "user", "content": content}])
+
+        assert result.failed is False
+
+    @pytest.mark.asyncio
     async def test_input_passed(self, mock_rails):
         messages = [{"role": "user", "content": "hello"}]
         result = await mock_rails.check_async(messages)
