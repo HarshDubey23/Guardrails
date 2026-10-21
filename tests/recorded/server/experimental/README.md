@@ -8,9 +8,9 @@ is not evidence that a real Rails configuration produces those verdicts.
 
 ## Current Chat coverage
 
-The [Chat suite](openai/test_chat_completions.py) explicitly selects the LiteLLM
-dialect for the archived NVIDIA inference exchanges. All six source cassettes
-remain unchanged. The [inventory](openai/test_litellm_inventory.py) pins which
+The [Chat suite](openai/test_chat_completions.py) selects the native OpenAI
+endpoint for direct OpenAI recordings and the LiteLLM dialect for the archived
+NVIDIA inference exchanges. All six gateway source cassettes remain unchanged. The [inventory](openai/test_litellm_inventory.py) pins which
 extension shapes actually occurred and checks runtime/export acceptance.
 
 | Scenario | Evidence and assertion |
@@ -31,6 +31,41 @@ Each replay pass consumes exactly one upstream interaction. Allowed-path
 comparison explicitly checks consumption, rewinds the cassette once, and then
 checks the uninspected pass separately. Unrestricted playback repeats are not
 enabled, so extra dispatches or HTTP retries cannot reuse the recorded response.
+
+## Native Chat evidence
+
+Four `test_native_chat_*` cassettes in `openai/cassettes/test_chat_completions/`
+were captured directly from `https://api.openai.com/v1/chat/completions` on
+2026-10-21: buffered/streaming success and invalid-model errors in both modes.
+The success profile uses `gpt-5-nano-2025-08-07`, one benign greeting, minimal
+reasoning, a 256-token completion budget, and `store: false`. Streaming requests
+include usage. This snapshot is a historical compatibility baseline matching the
+existing gateway model family, not a model recommendation.
+
+The native response contains ordinary message `refusal`/`annotations` fields;
+stream events contain root `obfuscation` and a final usage-only chunk. No
+`provider_specific_fields` container occurs in these native captures. These are
+observations for this model and request, not a universal native/gateway schema.
+
+The shared Chat helper selects endpoint and upstream explicitly. Native capture
+finishes before proxy validation; mandatory offline replay checks exact sanitized
+bytes, checker inputs, and one interaction per pass. Native successful cassettes
+also exercise buffered rejection, first/later streaming rejection, and overlapping
+context. Blocking tests force replay and never create synthetic recordings.
+
+To refresh only the four native captures with the credential already available:
+
+```bash
+make record-cassettes \
+  RECORDED_TESTS="tests/recorded/server/experimental/openai/test_chat_completions.py::test_native_chat_preserves_policy_and_wire tests/recorded/server/experimental/openai/test_chat_completions.py::test_native_chat_provider_error_is_preserved" \
+  RECORDED_REQUIRED_KEYS=OPENAI_API_KEY
+make replay-cassettes \
+  RECORDED_TESTS=tests/recorded/server/experimental/openai/test_chat_completions.py
+```
+
+The shared sanitizer is unchanged; replay equivalence refers to sanitized bytes,
+not network chunking or live delivery timing. No additional SDK dependency is
+required. Gateway recordings retain their separate provenance and credential.
 
 ## Native Responses coverage
 
