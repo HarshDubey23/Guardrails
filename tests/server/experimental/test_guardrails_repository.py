@@ -436,6 +436,48 @@ def test_configs_are_validated_at_application_construction(tmp_path):
         validate_config_entries((ConfigEntry("duplicate", path), ConfigEntry("duplicate", path)))
     with pytest.raises(ValueError, match="configuration directory"):
         validate_config_entries((ConfigEntry("missing", tmp_path / "missing"),))
+    with pytest.raises(ValueError, match="configuration directory"):
+        validate_config_entries((ConfigEntry("file", path / "config.yml"),))
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("filename", ["policy.yaml", "nested/policy.yaml", "config/config.yml"])
+async def test_application_loads_supported_config_directory_layouts(tmp_path, filename):
+    config_file = tmp_path / filename
+    config_file.parent.mkdir(parents=True, exist_ok=True)
+    config_file.write_text("models: []\n", encoding="utf-8")
+    (tmp_path / ".railsignore").write_text("ignored.yaml\n", encoding="utf-8")
+    (tmp_path / "ignored.yaml").write_text("invalid: [\n", encoding="utf-8")
+    application = create_proxy_application(
+        providers=(create_openai_chat_integration(),),
+        rails_configs=(ConfigEntry("policy", tmp_path),),
+        http_transport_factory=lambda: httpx.MockTransport(lambda _request: pytest.fail("no dispatch expected")),
+    )
+
+    async with application.router.lifespan_context(application):
+        runtime = _runtime.get_runtime(application)
+        assert isinstance(runtime.content_checkers.get("policy"), LegacyGuardrailsChecker)
+    assert runtime.http_client.is_closed
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("content", [None, "models: [{}]\n"], ids=["empty", "invalid"])
+async def test_invalid_config_contents_prevent_readiness_at_startup(tmp_path, content):
+    if content is not None:
+        (tmp_path / "policy.yaml").write_text(content, encoding="utf-8")
+    transport = httpx.MockTransport(lambda _request: pytest.fail("no dispatch expected"))
+    transport.aclose = AsyncMock()
+    application = create_proxy_application(
+        providers=(create_openai_chat_integration(),),
+        rails_configs=(ConfigEntry("policy", tmp_path),),
+        http_transport_factory=lambda: transport,
+    )
+
+    with pytest.raises(ValueError):
+        async with application.router.lifespan_context(application):
+            pytest.fail("invalid config must prevent readiness")
+    assert not hasattr(application.state, "proxy_runtime")
+    transport.aclose.assert_awaited_once()
 
 
 def test_multiple_configs_require_a_resolver(tmp_path):

@@ -93,8 +93,13 @@ at application construction.
 
 ## Lifecycle
 
-Config entries are validated and fixed during application assembly. Guardrails
-cores for **every declared configuration** are initialized sequentially before
+Config IDs and directory paths are validated and fixed during application
+assembly. Configuration discovery and parsing use `RailsConfig.from_path()`
+during startup, including its nested YAML layouts and `.railsignore` handling.
+There is no requirement for a file named `config.yml` or `config.yaml`. Invalid
+configuration contents, including an empty directory, prevent readiness.
+
+Guardrails cores for **every declared configuration** are initialized sequentially before
 the application becomes ready, including configurations the resolver might
 never select. Different IDs receive independent cores, even when their paths
 are identical. Requests perform a synchronous lookup of an already-started

@@ -44,16 +44,6 @@ class ConfigContext:
 ConfigResolver: TypeAlias = Callable[[ConfigContext], str | Awaitable[str]]
 
 
-def _contains_config(config_path: Path) -> bool:
-    candidates = (
-        config_path / "config.yml",
-        config_path / "config.yaml",
-        config_path / "config" / "config.yml",
-        config_path / "config" / "config.yaml",
-    )
-    return any(candidate.is_file() for candidate in candidates)
-
-
 def validate_config_entries(entries: Sequence[ConfigEntry]) -> tuple[ConfigEntry, ...]:
     """Normalize and validate the config entries declared by one application."""
 
@@ -67,7 +57,7 @@ def validate_config_entries(entries: Sequence[ConfigEntry]) -> tuple[ConfigEntry
         if entry.id in ids:
             raise ValueError(f"Duplicate Rails config id: {entry.id}")
         config_path = entry.config_path.expanduser().resolve()
-        if not config_path.is_dir() or not _contains_config(config_path):
+        if not config_path.is_dir():
             raise ValueError(f"Rails config '{entry.id}' does not reference a configuration directory.")
         ids.add(entry.id)
         resolved.append(ConfigEntry(id=entry.id, config_path=config_path))
