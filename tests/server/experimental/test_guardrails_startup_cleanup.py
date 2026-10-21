@@ -105,7 +105,7 @@ async def failed_startup(start, probe, failure):
         with pytest.raises(asyncio.CancelledError if failure == "cancel" else RuntimeError) as caught:
             await task
     if failure == "cancel":
-        assert caught.value.args == ("startup interrupted",)
+        assert task.cancelled()
     else:
         assert caught.value.__cause__ is probe.start_error
 
