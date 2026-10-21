@@ -23,6 +23,7 @@ from fastapi import FastAPI
 
 from nemoguardrails.server.experimental._content_checker import ContentInspectionPolicy, StreamBufferingPolicy
 from nemoguardrails.server.experimental._provider_transport import ProviderTransport
+from nemoguardrails.server.experimental.provider.integration import UpstreamSettings
 from nemoguardrails.server.experimental.providers.openai.integration import create_openai_chat_router
 from tests.server.experimental.checkers import StaticChecker
 from tests.server.experimental.conformance.openai.chat_completions.support import source_validator
@@ -56,7 +57,7 @@ async def proxy(checker, body, *, streaming=False, endpoint=None):
         )
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(upstream)) as upstream_client:
-        transport = ProviderTransport(upstream_client, base_url="https://provider.test")
+        transport = ProviderTransport(UpstreamSettings("https://provider.test"), upstream_client)
         app = FastAPI()
         app.include_router(
             create_openai_chat_router(
