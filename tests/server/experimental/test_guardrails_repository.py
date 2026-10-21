@@ -376,8 +376,6 @@ async def test_repository_retries_real_core_shutdown_after_queue_timeout(tmp_pat
 @pytest.mark.asyncio
 @pytest.mark.parametrize("failure", ["hang", "raise"])
 async def test_runtime_retains_cleanup_status_until_engine_retry_succeeds(tmp_path, monkeypatch, failure):
-    monkeypatch.setattr(_repository, "_SHUTDOWN_TIMEOUT_SECONDS", 0.01)
-
     async def fail_shutdown():
         if failure == "hang":
             await asyncio.Event().wait()
@@ -396,8 +394,11 @@ async def test_runtime_retains_cleanup_status_until_engine_retry_succeeds(tmp_pa
         await runtime.startup()
         engine.startup.assert_awaited_once()
         assert not runtime.has_pending_cleanup
-        with anyio.fail_after(1):
-            await runtime.close()
+        with monkeypatch.context() as failing_close:
+            if failure == "hang":
+                failing_close.setattr(_repository, "_SHUTDOWN_TIMEOUT_SECONDS", 0.1)
+            with anyio.fail_after(1):
+                await runtime.close()
         assert runtime.has_pending_cleanup
         assert runtime.http_client.is_closed
 
