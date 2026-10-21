@@ -245,17 +245,15 @@ request:
     stream_selector_field: stream
 response:
   additionalProperties: false
-  description: Derive coverage and extraction from the complete dialect declaration.
+  description: Bind one assistant text target; replacement is deliberately unsupported.
   properties:
     access_programs:
-      default: null
       x-nemo-guardrails:
         classification: opaque
     background:
       x-nemo-guardrails:
         classification: opaque
     billing:
-      default: null
       x-nemo-guardrails:
         classification: opaque
     completed_at:
@@ -271,7 +269,6 @@ response:
       x-nemo-guardrails:
         classification: opaque
     frequency_penalty:
-      default: null
       x-nemo-guardrails:
         classification: opaque
     id:
@@ -460,7 +457,6 @@ response:
       x-nemo-guardrails:
         classification: opaque
     presence_penalty:
-      default: null
       x-nemo-guardrails:
         classification: opaque
     previous_response_id:
@@ -494,7 +490,6 @@ response:
       x-nemo-guardrails:
         classification: opaque
     store:
-      default: null
       x-nemo-guardrails:
         classification: opaque
     temperature:
@@ -507,7 +502,6 @@ response:
       x-nemo-guardrails:
         classification: opaque
     tool_usage:
-      default: null
       x-nemo-guardrails:
         classification: opaque
     tools:
@@ -530,13 +524,13 @@ response:
         classification: opaque
   required:
   - output
-  title: openai.litellm.responses.response.text.v1
+  title: openai.responses.response.text.v1
   type: object
   x-nemo-guardrails:
     source: '#/components/schemas/Response'
     unknown_fields: forbid
     reject_case_aliases: true
-    model: LiteLLMGuardedResponses
+    model: ResponsesGuardedResponse
 integration:
   name: litellm_responses
   endpoint:
@@ -1225,18 +1219,16 @@ stream:
           classification: opaque
       response:
         additionalProperties: false
-        description: Apply the same reviewed metadata to initial and terminal response
-          snapshots.
+        description: Describe a full response snapshot without demanding a message
+          before generation.
         properties:
           access_programs:
-            default: null
             x-nemo-guardrails:
               classification: opaque
           background:
             x-nemo-guardrails:
               classification: opaque
           billing:
-            default: null
             x-nemo-guardrails:
               classification: opaque
           completed_at:
@@ -1252,7 +1244,6 @@ stream:
             x-nemo-guardrails:
               classification: opaque
           frequency_penalty:
-            default: null
             x-nemo-guardrails:
               classification: opaque
           id:
@@ -1443,7 +1434,6 @@ stream:
             x-nemo-guardrails:
               classification: opaque
           presence_penalty:
-            default: null
             x-nemo-guardrails:
               classification: opaque
           previous_response_id:
@@ -1477,7 +1467,6 @@ stream:
             x-nemo-guardrails:
               classification: opaque
           store:
-            default: null
             x-nemo-guardrails:
               classification: opaque
           temperature:
@@ -1490,7 +1479,6 @@ stream:
             x-nemo-guardrails:
               classification: opaque
           tool_usage:
-            default: null
             x-nemo-guardrails:
               classification: opaque
           tools:
@@ -1513,7 +1501,7 @@ stream:
               classification: opaque
         required:
         - output
-        title: LiteLLMLifecycleResponse
+        title: ResponsesLifecycleResponseProjection
         type: object
         x-nemo-guardrails:
           classification: guarded
@@ -1560,18 +1548,16 @@ stream:
           classification: opaque
       response:
         additionalProperties: false
-        description: Apply the same reviewed metadata to initial and terminal response
-          snapshots.
+        description: Describe a full response snapshot without demanding a message
+          before generation.
         properties:
           access_programs:
-            default: null
             x-nemo-guardrails:
               classification: opaque
           background:
             x-nemo-guardrails:
               classification: opaque
           billing:
-            default: null
             x-nemo-guardrails:
               classification: opaque
           completed_at:
@@ -1587,7 +1573,6 @@ stream:
             x-nemo-guardrails:
               classification: opaque
           frequency_penalty:
-            default: null
             x-nemo-guardrails:
               classification: opaque
           id:
@@ -1778,7 +1763,6 @@ stream:
             x-nemo-guardrails:
               classification: opaque
           presence_penalty:
-            default: null
             x-nemo-guardrails:
               classification: opaque
           previous_response_id:
@@ -1812,7 +1796,6 @@ stream:
             x-nemo-guardrails:
               classification: opaque
           store:
-            default: null
             x-nemo-guardrails:
               classification: opaque
           temperature:
@@ -1825,7 +1808,6 @@ stream:
             x-nemo-guardrails:
               classification: opaque
           tool_usage:
-            default: null
             x-nemo-guardrails:
               classification: opaque
           tools:
@@ -1848,7 +1830,7 @@ stream:
               classification: opaque
         required:
         - output
-        title: LiteLLMLifecycleResponse
+        title: ResponsesLifecycleResponseProjection
         type: object
         x-nemo-guardrails:
           classification: guarded
@@ -1895,18 +1877,16 @@ stream:
           classification: opaque
       response:
         additionalProperties: false
-        description: Apply the same reviewed metadata to initial and terminal response
-          snapshots.
+        description: Describe a full response snapshot without demanding a message
+          before generation.
         properties:
           access_programs:
-            default: null
             x-nemo-guardrails:
               classification: opaque
           background:
             x-nemo-guardrails:
               classification: opaque
           billing:
-            default: null
             x-nemo-guardrails:
               classification: opaque
           completed_at:
@@ -1922,7 +1902,6 @@ stream:
             x-nemo-guardrails:
               classification: opaque
           frequency_penalty:
-            default: null
             x-nemo-guardrails:
               classification: opaque
           id:
@@ -2113,7 +2092,6 @@ stream:
             x-nemo-guardrails:
               classification: opaque
           presence_penalty:
-            default: null
             x-nemo-guardrails:
               classification: opaque
           previous_response_id:
@@ -2147,7 +2125,6 @@ stream:
             x-nemo-guardrails:
               classification: opaque
           store:
-            default: null
             x-nemo-guardrails:
               classification: opaque
           temperature:
@@ -2160,7 +2137,6 @@ stream:
             x-nemo-guardrails:
               classification: opaque
           tool_usage:
-            default: null
             x-nemo-guardrails:
               classification: opaque
           tools:
@@ -2183,7 +2159,7 @@ stream:
               classification: opaque
         required:
         - output
-        title: LiteLLMLifecycleResponse
+        title: ResponsesLifecycleResponseProjection
         type: object
         x-nemo-guardrails:
           classification: guarded
@@ -2230,18 +2206,16 @@ stream:
           classification: opaque
       response:
         additionalProperties: false
-        description: Apply the same reviewed metadata to initial and terminal response
-          snapshots.
+        description: Describe a full response snapshot without demanding a message
+          before generation.
         properties:
           access_programs:
-            default: null
             x-nemo-guardrails:
               classification: opaque
           background:
             x-nemo-guardrails:
               classification: opaque
           billing:
-            default: null
             x-nemo-guardrails:
               classification: opaque
           completed_at:
@@ -2257,7 +2231,6 @@ stream:
             x-nemo-guardrails:
               classification: opaque
           frequency_penalty:
-            default: null
             x-nemo-guardrails:
               classification: opaque
           id:
@@ -2448,7 +2421,6 @@ stream:
             x-nemo-guardrails:
               classification: opaque
           presence_penalty:
-            default: null
             x-nemo-guardrails:
               classification: opaque
           previous_response_id:
@@ -2482,7 +2454,6 @@ stream:
             x-nemo-guardrails:
               classification: opaque
           store:
-            default: null
             x-nemo-guardrails:
               classification: opaque
           temperature:
@@ -2495,7 +2466,6 @@ stream:
             x-nemo-guardrails:
               classification: opaque
           tool_usage:
-            default: null
             x-nemo-guardrails:
               classification: opaque
           tools:
@@ -2518,7 +2488,7 @@ stream:
               classification: opaque
         required:
         - output
-        title: LiteLLMLifecycleResponse
+        title: ResponsesLifecycleResponseProjection
         type: object
         x-nemo-guardrails:
           classification: guarded
@@ -2565,18 +2535,16 @@ stream:
           classification: opaque
       response:
         additionalProperties: false
-        description: Apply the same reviewed metadata to initial and terminal response
-          snapshots.
+        description: Describe a full response snapshot without demanding a message
+          before generation.
         properties:
           access_programs:
-            default: null
             x-nemo-guardrails:
               classification: opaque
           background:
             x-nemo-guardrails:
               classification: opaque
           billing:
-            default: null
             x-nemo-guardrails:
               classification: opaque
           completed_at:
@@ -2592,7 +2560,6 @@ stream:
             x-nemo-guardrails:
               classification: opaque
           frequency_penalty:
-            default: null
             x-nemo-guardrails:
               classification: opaque
           id:
@@ -2783,7 +2750,6 @@ stream:
             x-nemo-guardrails:
               classification: opaque
           presence_penalty:
-            default: null
             x-nemo-guardrails:
               classification: opaque
           previous_response_id:
@@ -2817,7 +2783,6 @@ stream:
             x-nemo-guardrails:
               classification: opaque
           store:
-            default: null
             x-nemo-guardrails:
               classification: opaque
           temperature:
@@ -2830,7 +2795,6 @@ stream:
             x-nemo-guardrails:
               classification: opaque
           tool_usage:
-            default: null
             x-nemo-guardrails:
               classification: opaque
           tools:
@@ -2853,7 +2817,7 @@ stream:
               classification: opaque
         required:
         - output
-        title: LiteLLMLifecycleResponse
+        title: ResponsesLifecycleResponseProjection
         type: object
         x-nemo-guardrails:
           classification: guarded
@@ -2900,18 +2864,16 @@ stream:
           classification: opaque
       response:
         additionalProperties: false
-        description: Apply the same reviewed metadata to initial and terminal response
-          snapshots.
+        description: Describe a full response snapshot without demanding a message
+          before generation.
         properties:
           access_programs:
-            default: null
             x-nemo-guardrails:
               classification: opaque
           background:
             x-nemo-guardrails:
               classification: opaque
           billing:
-            default: null
             x-nemo-guardrails:
               classification: opaque
           completed_at:
@@ -2927,7 +2889,6 @@ stream:
             x-nemo-guardrails:
               classification: opaque
           frequency_penalty:
-            default: null
             x-nemo-guardrails:
               classification: opaque
           id:
@@ -3118,7 +3079,6 @@ stream:
             x-nemo-guardrails:
               classification: opaque
           presence_penalty:
-            default: null
             x-nemo-guardrails:
               classification: opaque
           previous_response_id:
@@ -3152,7 +3112,6 @@ stream:
             x-nemo-guardrails:
               classification: opaque
           store:
-            default: null
             x-nemo-guardrails:
               classification: opaque
           temperature:
@@ -3165,7 +3124,6 @@ stream:
             x-nemo-guardrails:
               classification: opaque
           tool_usage:
-            default: null
             x-nemo-guardrails:
               classification: opaque
           tools:
@@ -3188,7 +3146,7 @@ stream:
               classification: opaque
         required:
         - output
-        title: LiteLLMLifecycleResponse
+        title: ResponsesLifecycleResponseProjection
         type: object
         x-nemo-guardrails:
           classification: guarded

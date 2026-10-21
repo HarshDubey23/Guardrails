@@ -15,8 +15,8 @@
 
 """Bind reviewed LiteLLM Responses metadata without relaxing text boundaries.
 
-The added fields describe the observed gateway surface, not a claim that every
-field originates in LiteLLM. Requests and output-item policy remain OpenAI's.
+The event model annotation extends the native surface. Requests, buffered
+responses, lifecycle response objects, and output-item policy remain OpenAI's.
 See responses.md for source, recording provenance and explicit selection.
 """
 
@@ -27,10 +27,7 @@ from pydantic import BaseModel
 
 from nemoguardrails.server.experimental.provider.projection_policy import (
     PolicyModel,
-    guarded,
     opaque,
-    payload_contract,
-    text_location,
 )
 from nemoguardrails.server.experimental.provider.stream import StreamBinding
 from nemoguardrails.server.experimental.provider.stream_classifier import StreamClassifierDefinition
@@ -41,9 +38,6 @@ from nemoguardrails.server.experimental.provider.stream_policy import (
 )
 from nemoguardrails.server.experimental.providers.openai.responses import stream_projection as models
 from nemoguardrails.server.experimental.providers.openai.responses.endpoint import RESPONSES_ENDPOINT
-from nemoguardrails.server.experimental.providers.openai.responses.response_projection import (
-    ResponsesGuardedResponseProjection,
-)
 from nemoguardrails.server.experimental.providers.openai.responses.stream_classifier import (
     STREAM_CONTRACT as OPENAI_STREAM_CONTRACT,
 )
@@ -57,45 +51,10 @@ from nemoguardrails.server.experimental.providers.openai.responses.stream_classi
 from nemoguardrails.server.experimental.providers.openai.responses.stream_hooks import ResponsesStreamHooks
 
 
-class LiteLLMResponsesMetadata(PolicyModel):
-    """Preserve reviewed accounting and response-control metadata uninspected.
-
-    These are optional response fields, never request controls or event selectors.
-    Containers are intentionally opaque like the inherited usage metadata; this
-    does not authorize new output items, plaintext reasoning, or extension bags.
-    """
-
-    access_programs: Annotated[Any, opaque()] = None
-    billing: Annotated[Any, opaque()] = None
-    frequency_penalty: Annotated[Any, opaque()] = None
-    presence_penalty: Annotated[Any, opaque()] = None
-    store: Annotated[Any, opaque()] = None
-    tool_usage: Annotated[Any, opaque()] = None
-
-
-class LiteLLMResponsesProjection(ResponsesGuardedResponseProjection, LiteLLMResponsesMetadata):
-    """Retain one assistant text output and the inherited reasoning restrictions."""
-
-
-class LiteLLMGuardedResponses(LiteLLMResponsesProjection):
-    """Derive coverage and extraction from the complete dialect declaration."""
-
-    guarded_text_location = text_location(LiteLLMResponsesProjection)
-    projection_contract = payload_contract(
-        LiteLLMResponsesProjection,
-        projection_id="openai.litellm.responses.response.text.v1",
-        direction="response",
-    )
-
-
 class LiteLLMResponsesEventMetadata(PolicyModel):
     """Accept the gateway's model annotation without using it to select events."""
 
     model: Annotated[Any, opaque()] = None
-
-
-class LiteLLMLifecycleResponse(models.ResponsesLifecycleResponseProjection, LiteLLMResponsesMetadata):
-    """Apply the same reviewed metadata to initial and terminal response snapshots."""
 
 
 class LiteLLMTextDeltaEvent(models.ResponsesTextDeltaEventProjection, LiteLLMResponsesEventMetadata):
@@ -133,37 +92,25 @@ class LiteLLMReasoningDoneEvent(models.ResponsesReasoningDoneEventProjection, Li
 class LiteLLMCreatedEvent(models.ResponsesCreatedEventProjection, LiteLLMResponsesEventMetadata):
     """Check the creation snapshot with the reviewed response metadata."""
 
-    response: Annotated[LiteLLMLifecycleResponse, guarded()]
-
 
 class LiteLLMInProgressEvent(models.ResponsesInProgressEventProjection, LiteLLMResponsesEventMetadata):
     """Check the progress snapshot without introducing a separate text target."""
-
-    response: Annotated[LiteLLMLifecycleResponse, guarded()]
 
 
 class LiteLLMQueuedEvent(models.ResponsesQueuedEventProjection, LiteLLMResponsesEventMetadata):
     """Recognize queued metadata without enabling background requests."""
 
-    response: Annotated[LiteLLMLifecycleResponse, guarded()]
-
 
 class LiteLLMCompletedEvent(models.ResponsesCompletedEventProjection, LiteLLMResponsesEventMetadata):
     """Check the native terminal snapshot against accumulated deltas."""
-
-    response: Annotated[LiteLLMLifecycleResponse, guarded()]
 
 
 class LiteLLMFailedEvent(models.ResponsesFailedEventProjection, LiteLLMResponsesEventMetadata):
     """Keep any output in failed responses subject to snapshot checks."""
 
-    response: Annotated[LiteLLMLifecycleResponse, guarded()]
-
 
 class LiteLLMIncompleteEvent(models.ResponsesIncompleteEventProjection, LiteLLMResponsesEventMetadata):
     """Keep partial output guarded even when generation is incomplete."""
-
-    response: Annotated[LiteLLMLifecycleResponse, guarded()]
 
 
 class LiteLLMErrorEvent(models.ResponsesErrorEventProjection, LiteLLMResponsesEventMetadata):
@@ -216,6 +163,5 @@ LITELLM_RESPONSES_ENDPOINT = replace(
     RESPONSES_ENDPOINT,
     contract_name="litellm_responses",
     operation="LiteLLM Responses",
-    guarded_response_model=LiteLLMGuardedResponses,
     stream=StreamBinding(STREAM_CLASSIFIER, ResponsesStreamHooks),
 )
