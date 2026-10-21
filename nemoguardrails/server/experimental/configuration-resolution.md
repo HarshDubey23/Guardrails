@@ -90,10 +90,24 @@ async def add_policy_subject(request, call_next):
     return await call_next(request)
 ```
 
-The resolver may be synchronous or asynchronous. It may consult trusted
-application state, an authorization service, a tenant registry, a session
-store, or rollout policy, but its result must still be one of the IDs declared
-at application construction.
+The resolver may be synchronous or asynchronous, and its result must be one of
+the IDs declared at application construction. Synchronous resolvers run on the
+application event loop and must perform only short, non-blocking selection from
+trusted in-memory state. Authentication middleware can prepare those facts
+before the resolver runs. A resolver that consults an authorization service,
+tenant registry, or session store must use asynchronous I/O with cancellation
+support and appropriate client timeouts.
+
+`create_proxy_application(config_resolution_timeout=5.0, ...)` sets the resolver's
+cooperative deadline in seconds, independently of outbound provider timeouts.
+The default is five seconds; an override must be finite and positive. A timeout
+fails closed through the provider-native `config_resolution_failed` response,
+without forwarding the request or selecting a fallback policy. Request
+cancellation propagates instead of becoming a configuration error.
+
+The deadline cannot preempt blocking synchronous work or force a resolver that
+suppresses cancellation to stop. Preloading removes request-time engine
+initialization; it does not make external policy selection free of latency.
 
 ## Lifecycle
 

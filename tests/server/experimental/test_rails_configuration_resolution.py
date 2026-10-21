@@ -13,11 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import json
 from unittest.mock import AsyncMock, MagicMock
 
+import anyio
 import httpx
 import pytest
+from fastapi import Request
 from fastapi.testclient import TestClient
 
 from nemoguardrails import RailsConfig
@@ -28,6 +31,7 @@ from nemoguardrails.server.experimental._content_checker import (
     StreamBufferingPolicy,
     UnsupportedContentCheckerConfiguration,
 )
+from nemoguardrails.server.experimental._runtime import ServerRuntime
 from nemoguardrails.server.experimental.providers.openai.integration import create_openai_chat_integration
 from nemoguardrails.server.experimental.rails import ConfigEntry
 from nemoguardrails.server.experimental.rails._adapter import LegacyGuardrailsChecker
@@ -147,6 +151,69 @@ def test_unknown_resolved_config_fails_closed_before_upstream(tmp_path, caplog):
     assert transport.requests == []
     assert "Rails config resolution failed for openai.chat_completions.create (openai): ValueError" in caplog.text
     assert "Unknown Rails config" not in caplog.text
+
+
+@pytest.mark.parametrize("stream", [False, True], ids=["buffered", "streaming"])
+@pytest.mark.parametrize("sync_factory", [False, True], ids=["async", "sync-returning-awaitable"])
+def test_resolver_deadline_cancels_selection_before_upstream(tmp_path, caplog, stream, sync_factory):
+    cancelled = []
+
+    async def resolve(_context):
+        try:
+            await asyncio.Event().wait()
+        finally:
+            cancelled.append(True)
+
+    transport = RecordingTransport()
+    application = create_proxy_application(
+        providers=(create_openai_chat_integration(),),
+        rails_configs=(config_entry(tmp_path),),
+        config_resolver=(lambda context: resolve(context)) if sync_factory else resolve,
+        config_resolution_timeout=0.01,
+        http_transport_factory=lambda: transport,
+    )
+
+    with TestClient(application) as client:
+        response = client.post("/v1/chat/completions", json={**chat_request(), "stream": stream})
+
+    assert response.status_code == 502
+    assert response.json()["error"]["code"] == "config_resolution_failed"
+    assert cancelled == [True]
+    assert transport.requests == []
+    assert "TimeoutError" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_cancelling_request_cancels_resolver_without_rewriting_failure(tmp_path):
+    entered = asyncio.Event()
+    cancelled = asyncio.Event()
+
+    async def resolve(_context):
+        entered.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            cancelled.set()
+
+    runtime = ServerRuntime.create((config_entry(tmp_path),), resolve)
+    task = asyncio.create_task(runtime.resolve_content_checker(Request({"type": "http"}), "openai", "test", "chat"))
+    try:
+        with anyio.fail_after(1):
+            await entered.wait()
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+        assert cancelled.is_set()
+    finally:
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+        await runtime.close()
+
+
+@pytest.mark.parametrize("timeout", [0, -1, float("inf"), float("nan"), True, None, "5"])
+def test_invalid_config_resolution_deadline_rejected_during_assembly(timeout):
+    with pytest.raises(ValueError, match="config resolution timeout"):
+        create_proxy_application(providers=(create_openai_chat_integration(),), config_resolution_timeout=timeout)
 
 
 @pytest.mark.parametrize("stream", [False, True], ids=["buffered", "streaming"])

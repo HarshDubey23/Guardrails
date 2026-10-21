@@ -17,6 +17,7 @@
 
 import inspect
 import logging
+import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 from http.cookiejar import Cookie, CookieJar, DefaultCookiePolicy
@@ -31,7 +32,14 @@ from nemoguardrails.server.experimental.rails import ConfigContext, ConfigEntry,
 from nemoguardrails.server.experimental.rails._repository import GuardrailsRepository
 
 log = logging.getLogger(__name__)
+DEFAULT_CONFIG_RESOLUTION_TIMEOUT = 5.0
 _HTTP_SHUTDOWN_TIMEOUT_SECONDS = 5.0
+
+
+def _validate_config_resolution_timeout(timeout: float) -> float:
+    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or timeout <= 0:
+        raise ValueError("The config resolution timeout must be a finite positive number of seconds.")
+    return float(timeout)
 
 
 async def _close_http_resource(resource: httpx.AsyncClient | httpx.AsyncBaseTransport) -> None:
@@ -60,6 +68,7 @@ class ServerRuntime:
     http_client: httpx.AsyncClient
     content_checkers: GuardrailsRepository
     config_resolver: ConfigResolver | None
+    config_resolution_timeout: float = DEFAULT_CONFIG_RESOLUTION_TIMEOUT
 
     @classmethod
     def create(
@@ -68,7 +77,9 @@ class ServerRuntime:
         resolver: ConfigResolver | None,
         *,
         http_transport: httpx.AsyncBaseTransport | None = None,
+        config_resolution_timeout: float = DEFAULT_CONFIG_RESOLUTION_TIMEOUT,
     ) -> "ServerRuntime":
+        config_resolution_timeout = _validate_config_resolution_timeout(config_resolution_timeout)
         return cls(
             http_client=httpx.AsyncClient(
                 follow_redirects=False,
@@ -78,6 +89,7 @@ class ServerRuntime:
             ),
             content_checkers=GuardrailsRepository(entries),
             config_resolver=resolver,
+            config_resolution_timeout=config_resolution_timeout,
         )
 
     async def resolve_content_checker(
@@ -97,9 +109,10 @@ class ServerRuntime:
             provider_instance_id=provider_instance_id,
             operation_name=operation_name,
         )
-        config_id = self.config_resolver(context)
-        if inspect.isawaitable(config_id):
-            config_id = await config_id
+        with anyio.fail_after(self.config_resolution_timeout):
+            config_id = self.config_resolver(context)
+            if inspect.isawaitable(config_id):
+                config_id = await config_id
         if not isinstance(config_id, str) or not config_id:
             raise TypeError("The config resolver must return a non-empty config id.")
         return self.content_checkers.get(config_id)
