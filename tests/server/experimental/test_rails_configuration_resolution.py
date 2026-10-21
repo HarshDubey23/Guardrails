@@ -130,7 +130,7 @@ def test_trusted_resolver_receives_request_and_provider_context(tmp_path, monkey
     assert transport.requests[0].headers["x-nemo-guardrails-config"] == "ignored-by-guardrails"
 
 
-def test_unknown_resolved_config_fails_closed_before_upstream(tmp_path):
+def test_unknown_resolved_config_fails_closed_before_upstream(tmp_path, caplog):
     transport = RecordingTransport()
     application = create_proxy_application(
         providers=(create_openai_chat_integration(),),
@@ -145,6 +145,55 @@ def test_unknown_resolved_config_fails_closed_before_upstream(tmp_path):
     assert response.status_code == 502
     assert response.json()["error"]["code"] == "config_resolution_failed"
     assert transport.requests == []
+    assert "Rails config resolution failed for openai.chat_completions.create (openai): ValueError" in caplog.text
+    assert "Unknown Rails config" not in caplog.text
+
+
+@pytest.mark.parametrize("stream", [False, True], ids=["buffered", "streaming"])
+@pytest.mark.parametrize("asynchronous", [False, True], ids=["sync", "async"])
+@pytest.mark.parametrize("invalid_result", [False, True], ids=["exception", "invalid-result"])
+def test_resolver_failure_logs_identity_without_sensitive_details(
+    tmp_path, caplog, stream, asynchronous, invalid_result
+):
+    marker = "resolver-sensitive-marker"
+
+    def resolve(_context):
+        if invalid_result:
+            return {"private": marker}
+        raise RuntimeError(marker)
+
+    async def resolve_async(context):
+        return resolve(context)
+
+    transport = RecordingTransport()
+    application = create_proxy_application(
+        providers=(create_openai_chat_integration(instance_id="production"),),
+        rails_configs=(config_entry(tmp_path),),
+        config_resolver=resolve_async if asynchronous else resolve,
+        http_transport_factory=lambda: transport,
+    )
+
+    with TestClient(application) as client:
+        response = client.post(
+            "/v1/chat/completions",
+            json={**chat_request(), "stream": stream},
+            headers={"authorization": f"Bearer {marker}"},
+        )
+
+    assert response.status_code == 502
+    assert response.json()["error"]["code"] == "config_resolution_failed"
+    assert transport.requests == []
+    records = [record for record in caplog.records if record.name == "nemoguardrails.server.experimental._http_kernel"]
+    assert len(records) == 1
+    record = records[0]
+    error_type = "TypeError" if invalid_result else "RuntimeError"
+    assert record.levelname == "WARNING"
+    assert record.getMessage() == (
+        f"Rails config resolution failed for production.chat_completions.create (openai): {error_type}"
+    )
+    assert record.exc_info is None
+    assert marker not in caplog.text
+    assert marker not in response.text
 
 
 @pytest.mark.parametrize(

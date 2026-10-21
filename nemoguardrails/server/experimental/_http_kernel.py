@@ -16,6 +16,7 @@
 """Create transparent HTTP proxy routes for buffered provider operations."""
 
 import inspect
+import logging
 import re
 from collections.abc import Awaitable, Callable, Collection, Mapping
 from dataclasses import dataclass, replace
@@ -61,6 +62,8 @@ from nemoguardrails.server.experimental._http_paths import (
     _routes_overlap,
     _strip_mount_prefix,
 )
+
+log = logging.getLogger(__name__)
 
 DEFAULT_MAX_REQUEST_BODY_BYTES = 1024 * 1024
 DEFAULT_MAX_RESPONSE_BODY_BYTES = 10 * 1024 * 1024
@@ -464,6 +467,13 @@ def _guarded_handler(
                         render_outcome,
                     )
                 except Exception as failure:
+                    log.warning(
+                        "Rails config resolution failed for %s.%s (%s): %s",
+                        provider_instance_id,
+                        declaration.operation.name,
+                        provider_type,
+                        type(failure).__name__,
+                    )
                     return _render_failure(ContentCheckerResolutionFailed(failure), render_outcome)
             if resolved_checker is None:
                 raise AssertionError("A guarded operation requires a resolved content checker.")

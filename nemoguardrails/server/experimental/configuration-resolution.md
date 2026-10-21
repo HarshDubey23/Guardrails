@@ -54,6 +54,10 @@ failures, empty IDs, and unknown IDs fail closed with the provider-native
 `config_resolution_failed` response before an upstream request is made. A
 single declared config gets a static resolver automatically.
 
+Resolution failures emit a warning containing the server-supplied provider and
+operation identity and the exception type. Exception messages, tracebacks, and
+request data are omitted from that warning.
+
 ## Resolution context
 
 The resolver receives a `ConfigContext` containing:
