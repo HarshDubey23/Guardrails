@@ -39,7 +39,10 @@ from tests.server.experimental.conformance.openai.chat_completions.support impor
     sse_bytes,
 )
 
-pytestmark = [pytest.mark.asyncio, pytest.mark.block_network]
+pytestmark = [
+    pytest.mark.asyncio,
+    pytest.mark.block_network(allowed_hosts=[r"^127\.0\.0\.1$", r"^::1$"]),
+]
 TEXT = "Cafe\u0301 — “quoted” ☃"
 MESSAGE = ("choices", 0, "message")
 CHOICE = ("choices", 0)
