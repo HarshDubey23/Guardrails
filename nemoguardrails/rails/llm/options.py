@@ -109,10 +109,7 @@ class RailsResult(BaseModel):
     rail: Optional[str] = Field(default=None, description="Name of the rail that blocked the content.")
     failed: bool = Field(
         default=False,
-        description=(
-            "Whether IORails reported a rail execution failure. Such failures retain BLOCKED status. "
-            "LLMRails does not populate this flag; False means no typed failure was reported."
-        ),
+        description=("Whether the engine reported a rail execution failure. Such failures retain BLOCKED status."),
     )
     reason: Optional[str] = Field(
         default=None,
