@@ -75,6 +75,14 @@ cookies, authentication state, and application middleware state, but raw
 caller values are not trusted merely because they are available to the
 resolver.
 
+The proxy reads and validates the guarded request body within its configured
+size limit before invoking the resolver. Asynchronous resolvers can use
+`await context.request.body()` or `await context.request.json()` to read that
+buffered body without consuming the connection again. Reading the body does
+not change the original bytes forwarded upstream. Configuration resolution
+runs once per guarded request; the selected checker handles both input and
+output inspection, including streaming responses.
+
 Middleware can attach normalized deployment-owned policy facts before a
 guarded route runs:
 

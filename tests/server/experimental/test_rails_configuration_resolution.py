@@ -134,6 +134,82 @@ def test_trusted_resolver_receives_request_and_provider_context(tmp_path, monkey
     assert transport.requests[0].headers["x-nemo-guardrails-config"] == "ignored-by-guardrails"
 
 
+@pytest.mark.parametrize("stream", [False, True])
+@pytest.mark.parametrize("body_reader", ["json", "body", "stream"])
+def test_resolver_reads_buffered_body_and_preserves_forwarded_bytes(tmp_path, monkeypatch, stream, body_reader):
+    entries = tuple(config_entry(tmp_path, name) for name in ("first", "second"))
+    checkers = {entry.id: checker(inspect_output=True, streaming=stream) for entry in entries}
+    for value in checkers.values():
+        policy = value.inspection_policy.return_value
+        value.inspection_policy.return_value = ContentInspectionPolicy(True, True, policy.stream_buffering)
+    get_checker = MagicMock(side_effect=checkers.__getitem__)
+    monkeypatch.setattr(GuardrailsRepository, "get", get_checker)
+    resolved_bodies = []
+
+    async def resolve_config(context):
+        request = context.request
+        if body_reader == "json":
+            payload = await request.json()
+        elif body_reader == "body":
+            payload = json.loads(await request.body())
+        else:
+            payload = json.loads(b"".join([chunk async for chunk in request.stream()]))
+        resolved_bodies.append(await request.body())
+        assert await request.json() == payload
+        return {"first-model": "first", "second-model": "second"}[payload["model"]]
+
+    transport = RecordingTransport()
+    application = create_proxy_application(
+        providers=(create_openai_chat_integration(),),
+        rails_configs=entries,
+        config_resolver=resolve_config,
+        http_transport_factory=lambda: transport,
+    )
+    bodies = []
+    with TestClient(application) as client:
+        for name in checkers:
+            body = json.dumps({**chat_request(), "model": f"{name}-model", "stream": stream}, indent=2).encode()
+            bodies.append(body)
+            response = client.post("/v1/chat/completions", content=body, headers={"content-type": "application/json"})
+            assert response.status_code == 200
+            if stream:
+                assert response.content.endswith(b"data: [DONE]\n\n")
+
+    assert resolved_bodies == bodies
+    assert [request.content for request in transport.requests] == bodies
+    assert [call.args[0] for call in get_checker.call_args_list] == ["first", "second"]
+    for value in checkers.values():
+        value.check_input.assert_awaited_once()
+        value.check_output.assert_awaited()
+
+
+@pytest.mark.parametrize("chunked", [False, True])
+def test_oversized_request_is_rejected_before_body_based_resolution(tmp_path, chunked):
+    resolver = AsyncMock(return_value="policy")
+    transport = RecordingTransport()
+    body = json.dumps(chat_request()).encode()
+    application = create_proxy_application(
+        providers=(create_openai_chat_integration(),),
+        rails_configs=(config_entry(tmp_path),),
+        config_resolver=resolver,
+        http_transport_factory=lambda: transport,
+        max_request_body_bytes=len(body) - 1,
+    )
+    with TestClient(application) as client:
+        request = client.build_request(
+            "POST",
+            "/v1/chat/completions",
+            content=iter((body[:10], body[10:])) if chunked else body,
+            headers={"content-type": "application/json"},
+        )
+        assert ("content-length" not in request.headers) == chunked
+        response = client.send(request)
+
+    assert response.status_code == 413
+    resolver.assert_not_called()
+    assert transport.requests == []
+
+
 def test_unknown_resolved_config_fails_closed_before_upstream(tmp_path, caplog):
     transport = RecordingTransport()
     application = create_proxy_application(

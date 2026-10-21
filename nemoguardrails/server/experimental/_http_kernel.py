@@ -307,13 +307,15 @@ async def _buffer_request(request: Request, max_body_bytes: int) -> BufferedHttp
         body.extend(chunk)
     if parsed_content_length is not None and parsed_content_length != len(body):
         raise InvalidContentLength("Content-Length must match the buffered request body.")
+    buffered_body = bytes(body)
+    request._body = buffered_body
     return BufferedHttpRequest(
         method=request.method,
         path=get_route_path(request.scope),
         raw_path=_request_path(request),
         query=request.scope.get("query_string", b""),
         headers=tuple(request.scope.get("headers", ())),
-        body=bytes(body),
+        body=buffered_body,
     )
 
 
