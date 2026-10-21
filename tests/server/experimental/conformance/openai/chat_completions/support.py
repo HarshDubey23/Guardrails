@@ -27,6 +27,8 @@ from pathlib import Path
 import yaml
 from jsonschema import Draft202012Validator
 
+from tests.recorded.cassette import cassette_with_rehydrated_bodies
+
 FIXTURE = Path(__file__).parent / "fixtures/pinned.openapi.yaml"
 DESCRIPTOR = Path(__file__).parents[6] / "nemoguardrails/server/experimental/contracts/openai/source.yaml"
 
@@ -141,3 +143,21 @@ def sse_bytes(*events):
         b"".join(b"data: " + json.dumps(event, ensure_ascii=False).encode() + b"\r\n\r\n" for event in events)
         + b"data: [DONE]\r\n\r\n"
     )
+
+
+def recorded_exchange(stream, *, gateway=False):
+    directory = Path(__file__).parents[5] / "recorded/server/experimental/openai/cassettes/test_chat_completions"
+    if gateway:
+        name = (
+            "test_streaming_chat_preserves_declared_events_and_opaque_metadata"
+            if stream
+            else "test_buffered_chat_preserves_guarded_constrained_and_opaque_contract_fields"
+        )
+    else:
+        name = f"test_native_chat_preserves_policy_and_wire[{'streaming' if stream else 'buffered'}]"
+    (interaction,) = cassette_with_rehydrated_bodies(
+        yaml.safe_load((directory / f"{name}.yaml").read_text(encoding="utf-8"))
+    )["interactions"]
+    assert interaction["response"]["status"]["code"] == 200
+    body = interaction["response"]["body"]["string"]
+    return json.loads(interaction["request"]["body"]), body.encode() if isinstance(body, str) else body

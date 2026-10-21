@@ -24,8 +24,16 @@ import yaml
 from jsonschema import Draft202012Validator
 
 from nemoguardrails.server.experimental.provider.contract_export import export_guard_contract
-from nemoguardrails.server.experimental.provider.projection_policy import field_coverage, model_graph
+from nemoguardrails.server.experimental.provider.projection_policy import (
+    PolicyModel,
+    field_coverage,
+    field_policy,
+    model_graph,
+)
 from nemoguardrails.server.experimental.providers.openai.chat_completions.endpoint import CHAT_COMPLETIONS_ENDPOINT
+from nemoguardrails.server.experimental.providers.openai.dialects.litellm.chat_completions import (
+    LITELLM_CHAT_COMPLETIONS_ENDPOINT,
+)
 from tests.server.experimental.conformance.openai.chat_completions.fixtures.extract_source import (
     extract_chat_source,
     structural_fields,
@@ -38,6 +46,12 @@ from tests.server.experimental.conformance.openai.chat_completions.support impor
     resolve_pointer,
     source_document,
 )
+
+ENDPOINTS = [
+    pytest.param(CHAT_COMPLETIONS_ENDPOINT, id="openai"),
+    pytest.param(LITELLM_CHAT_COMPLETIONS_ENDPOINT, id="litellm"),
+]
+
 
 FIXTURE_SHA256 = "a84917786d64f8a04998da6f166b9b293eba20a1f093dd49ac69a1498f78454f"
 REQUEST = CHAT_COMPLETIONS_ENDPOINT.guarded_request_model
@@ -213,3 +227,108 @@ def test_source_nullable_adapter_does_not_rewrite_literal_data():
 def test_reference_resolution_rejects_network_locations():
     with pytest.raises(ValueError, match="local JSON pointer"):
         resolve_pointer({}, "https://provider.test/schema.json")
+
+
+def nested_model(annotation):
+    if isinstance(annotation, type) and issubclass(annotation, PolicyModel):
+        return annotation
+    models = [model for arg in get_args(annotation) if (model := nested_model(arg)) is not None]
+    assert len(models) <= 1
+    return models[0] if models else None
+
+
+def bound_surfaces(endpoint):
+    stream, error = [rule.model for rule in endpoint.stream.classifier.rules]
+    request = endpoint.guarded_request_model
+    response = endpoint.guarded_response_model
+    user = nested_model(request.model_fields["messages"].annotation)
+    choice = nested_model(response.model_fields["choices"].annotation)
+    message = nested_model(choice.model_fields["message"].annotation)
+    stream_choice = nested_model(stream.model_fields["choices"].annotation)
+    delta = nested_model(stream_choice.model_fields["delta"].annotation)
+    details = nested_model(error.model_fields["error"].annotation)
+    return dict(
+        request=request,
+        user=user,
+        response=response,
+        choice=choice,
+        message=message,
+        stream=stream,
+        stream_choice=stream_choice,
+        delta=delta,
+        error=error,
+        error_details=details,
+    )
+
+
+@pytest.mark.parametrize("endpoint", ENDPOINTS)
+@pytest.mark.parametrize(
+    "surface,field,classification",
+    [
+        ("request", "messages", "guarded"),
+        ("request", "tools", "constrained"),
+        ("request", "response_format", "constrained"),
+        ("request", "prediction", "constrained"),
+        ("request", "reasoning_effort", "constrained"),
+        ("request", "logprobs", "constrained"),
+        ("user", "content", "guarded"),
+        ("user", "name", "constrained"),
+        ("response", "choices", "guarded"),
+        ("response", "usage", "opaque"),
+        ("choice", "message", "guarded"),
+        ("choice", "index", "opaque"),
+        ("choice", "logprobs", "constrained"),
+        ("message", "content", "guarded"),
+        ("message", "annotations", "constrained"),
+        ("message", "refusal", "constrained"),
+        ("message", "reasoning_content", "constrained"),
+        ("message", "tool_calls", "constrained"),
+        ("stream", "choices", "guarded"),
+        ("stream", "usage", "opaque"),
+        ("stream", "obfuscation", "opaque"),
+        ("stream_choice", "index", "constrained"),
+        ("stream_choice", "delta", "guarded"),
+        ("delta", "content", "guarded"),
+        ("delta", "refusal", "constrained"),
+        ("delta", "reasoning_content", "constrained"),
+        ("delta", "tool_calls", "constrained"),
+        ("error", "error", "constrained"),
+        ("error_details", "message", "constrained"),
+    ],
+)
+def test_content_classification_is_an_explicit_decision(endpoint, surface, field, classification):
+    model = bound_surfaces(endpoint)[surface]
+    if field in model.policy.opaque:
+        assert classification == "opaque"
+    else:
+        assert field_policy(model.model_fields[field])["classification"] == classification
+
+
+def test_litellm_bound_graph_has_only_reviewed_additions():
+    base = bound_surfaces(CHAT_COMPLETIONS_ENDPOINT)
+    dialect = bound_surfaces(LITELLM_CHAT_COMPLETIONS_ENDPOINT)
+    additions = {
+        "choice": {"provider_specific_fields"},
+        "message": {"provider_specific_fields", "images", "thinking_blocks", "reasoning_items"},
+        "stream": {"provider_specific_fields"},
+        "delta": {"provider_specific_fields", "images", "thinking_blocks", "reasoning_items", "annotations"},
+    }
+    for surface, model in dialect.items():
+        assert field_coverage(model).reviewed_fields == field_coverage(base[surface]).reviewed_fields | additions.get(
+            surface, set()
+        )
+        for name in additions.get(surface, set()):
+            assert field_policy(model.model_fields[name])["classification"] == "constrained"
+    bags = {
+        surface: nested_model(dialect[surface].model_fields["provider_specific_fields"].annotation)
+        for surface in ("choice", "message", "stream", "delta")
+    }
+    assert field_coverage(bags["choice"]).opaque_fields == {"native_finish_reason"}
+    assert field_coverage(bags["choice"]).reviewed_fields == {"native_finish_reason"}
+    assert field_coverage(bags["message"]).constrained_fields == {"refusal", "thinking_blocks"}
+    assert field_coverage(bags["message"]).reviewed_fields == {"refusal", "thinking_blocks"}
+    assert field_coverage(bags["stream"]).reviewed_fields == set()
+    assert field_coverage(bags["delta"]).reviewed_fields == set()
+    roots = [dialect[name] for name in ("request", "response", "stream", "error")]
+    bound = {model for root in roots for model in model_graph(root).values()}
+    assert bound == set(dialect.values()) | set(bags.values())

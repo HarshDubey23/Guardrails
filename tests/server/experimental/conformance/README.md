@@ -9,7 +9,8 @@ dialect. They do not establish compatibility with every OpenAI-compatible deploy
 
 - `openai/chat_completions/test_schema.py` audits every bound policy model
   against its inspected source object, including reviewed opaque fields and
-  explicit local extensions. Export consistency is a secondary check.
+  explicit local extensions. It also checks explicit content classifications for
+  both endpoints and the complete LiteLLM model graph. Export consistency is secondary.
 - `openai/chat_completions/test_http.py` exercises the actual router and HTTP
   dispatcher with synthetic source-valid examples. It checks metadata and byte
   preservation, exact inspected text, unsupported content, error envelopes, and
@@ -19,6 +20,10 @@ dialect. They do not establish compatibility with every OpenAI-compatible deploy
   through the same HTTP harness. Cases follow the
   [reviewed LiteLLM source inventory](../../../../nemoguardrails/server/experimental/providers/openai/dialects/litellm/README.md),
   not the OpenAI schema or additional recordings.
+- `openai/chat_completions/test_recorded_probes.py` adds native/gateway positive
+  controls and synthetic mutations of recorded bodies. It makes pinned-source
+  discrepancies explicit and checks additional text, usage-only events, request
+  admission, and dialect selection. See the [Chat review guide](openai/chat_completions/README.md).
 
 - `openai/responses/test_schema.py` audits bound request, response, and event
   models against the pinned source inventory and official example, with explicit
