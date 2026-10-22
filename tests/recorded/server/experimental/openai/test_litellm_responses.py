@@ -51,14 +51,16 @@ pytestmark = [
 BASE_URL = "https://inference-api.nvidia.com/v1"
 MODEL = "openai/openai/gpt-5-nano"
 INPUT = "Reply with exactly: Hello."
+LONG_INPUT = "Reply with exactly: A calm morning begins with warm sunlight, a quiet cup of tea, and a friendly hello."
+LONG_STREAM_RECORDING = "test_success_preserves_policy_and_wire[streaming-long-output].yaml"
 ENDPOINT = LITELLM_RESPONSES_ENDPOINT
 proxy = partial(responses_proxy, endpoint=ENDPOINT, base_url=BASE_URL)
 
 
-def responses_request(stream, *, model=MODEL):
+def responses_request(stream, *, model=MODEL, input_text=INPUT):
     return {
         "model": model,
-        "input": INPUT,
+        "input": input_text,
         "stream": stream,
         "store": False,
         "max_output_tokens": 256,
@@ -133,11 +135,18 @@ async def validate_inventory(upstream, request):
     return "".join(text)
 
 
-@pytest.mark.parametrize("stream", [False, True], ids=["buffered", "streaming"])
+@pytest.mark.parametrize(
+    "stream,input_text",
+    [
+        pytest.param(False, INPUT, id="buffered"),
+        pytest.param(True, INPUT, id="streaming"),
+        pytest.param(True, LONG_INPUT, id="streaming-long-output"),
+    ],
+)
 async def test_success_preserves_policy_and_wire(
-    nvidia_inference_key, record_mode, recorded_cassette_path, vcr, stream
+    nvidia_inference_key, record_mode, recorded_cassette_path, vcr, stream, input_text
 ):
-    request = responses_request(stream)
+    request = responses_request(stream, input_text=input_text)
     upstream = await capture(nvidia_inference_key, request)
     assert upstream.status_code == 200
     if record_mode != "none":
@@ -150,6 +159,20 @@ async def test_success_preserves_policy_and_wire(
     assert cassette_request_jsons(recorded_cassette_path) == [request]
     text = await validate_inventory(upstream, request)
     assert text
+    if stream:
+        text_parts = [
+            payload["delta"]
+            for event in await events(upstream.content)
+            if event.data not in (None, b"[DONE]")
+            and (payload := json.loads(event.data))["type"] == "response.output_text.delta"
+            and payload["delta"]
+        ]
+        if input_text == LONG_INPUT:
+            assert len(text_parts) >= 4
+    else:
+        message = next(item for item in upstream.json()["output"] if item["type"] == "message")
+        text_parts = [part["text"] for part in message["content"] if part["type"] == "output_text"]
+    assert "".join(text_parts) == text
     for inspected in (True, False):
         vcr.rewind()
         checker = StaticChecker(
@@ -164,15 +187,53 @@ async def test_success_preserves_policy_and_wire(
         assert len(dispatches) == len(vcr.requests) == vcr.play_count == 1
         assert vcr.all_played
         assert json.loads(dispatches[0].body) == request
-        if inspected:
-            assert checker.text_calls[0] == ("input", INPUT)
-            assert "".join(value for kind, value in checker.text_calls if kind == "output") == text
-        else:
-            assert checker.calls == []
+        assert checker.text_calls == (
+            [("input", input_text)] + [("output", part) for part in text_parts] if inspected else []
+        )
+
+
+@pytest.mark.parametrize("stream", [False, True], ids=["buffered", "streaming"])
+async def test_invalid_model_preserves_provider_error(
+    nvidia_inference_key, record_mode, recorded_cassette_path, vcr, stream
+):
+    request = responses_request(stream, model="openai/openai/recorded-invalid-model")
+    upstream = await capture(nvidia_inference_key, request)
+    assert upstream.status_code == 403
+    assert upstream.json()["error"]["type"] == "key_model_access_denied"
+    assert request["model"] in upstream.json()["error"]["message"]
+    assert len(vcr.requests) == 1
+    if record_mode != "none":
+        return
+
+    assert vcr.play_count == 1
+    assert vcr.all_played
+    assert cassette_request_jsons(recorded_cassette_path) == [request]
+    for inspected in (True, False):
+        vcr.rewind()
+        checker = StaticChecker(
+            ContentInspectionPolicy(inspected, inspected, StreamBufferingPolicy(1, 0) if inspected else None)
+        )
+        dispatches = []
+        async with proxy(nvidia_inference_key, checker, dispatches) as client:
+            response = await client.post("/v1/responses", json=request)
+        assert len(dispatches) == len(vcr.requests) == vcr.play_count == 1
+        assert vcr.all_played
+        assert json.loads(dispatches[0].body) == request
+        assert response.status_code == upstream.status_code
+        assert response.content == upstream.content
+        assert response.headers["content-type"] == upstream.headers["content-type"]
+        assert checker.text_calls == ([("input", INPUT)] if inspected else [])
 
 
 @pytest.mark.vcr("test_success_preserves_policy_and_wire[buffered].yaml", record_mode="none")
 async def test_buffered_output_is_withheld_on_block(nvidia_inference_key, vcr):
+    upstream = await capture(nvidia_inference_key, responses_request(False))
+    assert len(vcr.requests) == vcr.play_count == 1
+    assert vcr.all_played
+    message = next(item for item in upstream.json()["output"] if item["type"] == "message")
+    text = "".join(part["text"] for part in message["content"] if part["type"] == "output_text")
+    assert text
+    vcr.rewind()
     checker = StaticChecker(ContentInspectionPolicy(True, True), output_decisions=[ContentBlocked("blocked by test")])
     dispatches = []
     async with proxy(nvidia_inference_key, checker, dispatches) as client:
@@ -181,15 +242,18 @@ async def test_buffered_output_is_withheld_on_block(nvidia_inference_key, vcr):
     assert response.json()["error"]["code"] == "content_blocked"
     assert len(dispatches) == len(vcr.requests) == vcr.play_count == 1
     assert vcr.all_played
-    assert checker.text_calls[0] == ("input", INPUT)
-    assert checker.text_calls[1][0] == "output"
-    assert checker.text_calls[1][1] not in response.text
+    assert checker.text_calls == [("input", INPUT), ("output", text)]
+    assert text not in response.text
 
 
-@pytest.mark.vcr("test_success_preserves_policy_and_wire[streaming].yaml", record_mode="none")
+@pytest.mark.vcr(LONG_STREAM_RECORDING, record_mode="none")
 @pytest.mark.parametrize("allowed_windows", [0, 1], ids=["first-window", "later-window"])
-async def test_stream_releases_only_approved_prefix(nvidia_inference_key, vcr, allowed_windows):
-    upstream = await capture(nvidia_inference_key, responses_request(True))
+@pytest.mark.parametrize("chunk_size,context_size", [(1, 0), (2, 1)], ids=["single-delta", "overlapping-context"])
+async def test_stream_releases_only_approved_prefix(
+    nvidia_inference_key, vcr, allowed_windows, chunk_size, context_size
+):
+    request = responses_request(True, input_text=LONG_INPUT)
+    upstream = await capture(nvidia_inference_key, request)
     recorded_events = await events(upstream.content)
     deltas = [
         (index, payload["delta"])
@@ -198,23 +262,31 @@ async def test_stream_releases_only_approved_prefix(nvidia_inference_key, vcr, a
         and (payload := json.loads(event.data))["type"] == "response.output_text.delta"
         and payload["delta"]
     ]
-    assert len(deltas) > allowed_windows
-    released_end = deltas[allowed_windows - 1][0] + 1 if allowed_windows else 0
-    assert vcr.play_count == 1
+    assert len(deltas) >= (allowed_windows + 1) * chunk_size
+    approved_deltas = allowed_windows * chunk_size
+    released_end = deltas[approved_deltas - 1][0] + 1 if approved_deltas else 0
+    assert len(vcr.requests) == vcr.play_count == 1
+    assert vcr.all_played
     vcr.rewind()
     checker = StaticChecker(
-        ContentInspectionPolicy(True, True, StreamBufferingPolicy(1, 0)),
+        ContentInspectionPolicy(True, True, StreamBufferingPolicy(chunk_size, context_size)),
         output_decisions=[ContentAllowed()] * allowed_windows + [ContentBlocked("blocked by test")],
     )
     dispatches = []
     async with proxy(nvidia_inference_key, checker, dispatches) as client:
-        response = await client.post("/v1/responses", json=responses_request(True))
+        response = await client.post("/v1/responses", json=request)
     assert response.status_code == 200
     received = await events(response.content)
     assert [event.raw for event in received[:-1]] == [event.raw for event in recorded_events[:released_end]]
     assert received[-1].event_type == b"error"
     assert json.loads(received[-1].data)["code"] == "content_blocked"
     assert b"[DONE]" not in response.content
-    assert checker.text_calls == [("input", INPUT)] + [("output", text) for _, text in deltas[: allowed_windows + 1]]
+    assert checker.text_calls == [("input", LONG_INPUT)] + [
+        (
+            "output",
+            "".join(text for _, text in deltas[max(0, window * chunk_size - context_size) : (window + 1) * chunk_size]),
+        )
+        for window in range(allowed_windows + 1)
+    ]
     assert len(dispatches) == len(vcr.requests) == vcr.play_count == 1
     assert vcr.all_played

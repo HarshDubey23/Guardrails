@@ -139,7 +139,11 @@ with `RECORDED_REQUIRED_KEYS=NVIDIA_INFERENCE_KEY`. Capture stores the complete
 sanitized response before checking policy; the subsequent offline replay is the
 acceptance gate. Responses uses the same shared sanitizer as Chat, with no extra
 content redaction; encrypted content and nested item-ID relationships are retained.
-These two cassettes establish neither Chat bridge nor arbitrary-backend compatibility.
+The five cassettes cover buffered/streaming successes, invalid-model HTTP errors,
+and a longer stream used for overlapping-context blocking. They establish neither
+Chat bridge nor arbitrary-backend compatibility. The
+[proxy integration guide](server/experimental/README.md#litellm-responses-follow-up-captures)
+records provenance and the reason for the additional streaming capture.
 
 The six archived LiteLLM Chat cassettes predate the dialect: their provider payloads are unchanged.
 Two buffered successes contain message `provider_specific_fields: {refusal: null}`

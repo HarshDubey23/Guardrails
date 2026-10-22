@@ -1,0 +1,455 @@
+version: 1
+interactions:
+- request:
+    method: POST
+    uri: https://inference-api.nvidia.com/v1/responses
+    headers:
+      host:
+      - inference-api.nvidia.com
+      accept:
+      - '*/*'
+      connection:
+      - keep-alive
+      user-agent:
+      - python-httpx/0.28.1
+      accept-encoding:
+      - identity
+      content-type:
+      - application/json
+    parsed_body:
+      model: openai/openai/gpt-5-nano
+      input: 'Reply with exactly: A calm morning begins with warm sunlight, a quiet cup of tea, and a friendly hello.'
+      stream: true
+      store: false
+      max_output_tokens: 256
+      reasoning:
+        effort: minimal
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      content-type:
+      - text/event-stream; charset=utf-8
+      transfer-encoding:
+      - chunked
+      connection:
+      - keep-alive
+      cache-control:
+      - no-cache
+      content-security-policy:
+      - frame-ancestors 'none'
+    body:
+      parsed_body:
+      - type: response.created
+        response:
+          id: resp_TMRxC5wFVGCFMCfGeY6bcn3tN6iXKeHRMthYw0ybBPdaSKq_wkRimClUUcEqjIWxsr38a9uKSjillpcOvWrLiuwh2d4dqXBFE44py6qg7r3C1lHzWtWOOBPcTfskuZmxXOXyBeYl-81TuP9mrTXjET_AY5Tu-Kt4P3WzcNxNPSXlgyxIfsJnQcWgicICp6vq6ypxVxZDP9o48_mi7FKo0dBYeoe6lD6c-0GSExxfnL1FDZ5tOW9RGr2G0ZdwPzlAk-TiwKfjeNttzwtvOhPY5yeegX52aMNt1SlPQFoVevoTV_ExwYmqtTUEpap0I6hjaK8L53DWJBEx9ZKMoCFgQ5V5GND714VtLvTlWZfGd_33oN9CbqxHoY6A4jvESsQZCkD9kKd5RD3COH_LsZaBD_B2JStBFUa1rkTV0xMs86MH4GU=
+          created_at: 1792683151
+          metadata: {}
+          model: gpt-5-nano-2025-08-07
+          object: response
+          output: []
+          parallel_tool_calls: true
+          temperature: 1.0
+          tool_choice: auto
+          tools: []
+          top_p: 1.0
+          max_output_tokens: 256
+          reasoning:
+            context: current_turn
+            effort: minimal
+            mode: standard
+            summary: null
+          status: in_progress
+          text:
+            format:
+              type: text
+            verbosity: medium
+          truncation: disabled
+          store: false
+          background: false
+          frequency_penalty: 0.0
+          presence_penalty: 0.0
+          prompt_cache_retention: in_memory
+          service_tier: auto
+          tool_usage:
+            image_gen:
+              input_tokens: 0
+              input_tokens_details:
+                image_tokens: 0
+                text_tokens: 0
+              output_tokens: 0
+              output_tokens_details:
+                image_tokens: 0
+                text_tokens: 0
+              total_tokens: 0
+            web_search:
+              num_requests: 0
+          top_logprobs: 0
+        sequence_number: 0
+        model: openai/openai/gpt-5-nano
+      - type: response.in_progress
+        response:
+          id: resp_TMRxC5wFVGCFMCfGeY6bcn3tN6iXKeHRMthYw0ybBPdaSKq_wkRimClUUcEqjIWxsr38a9uKSjillpcOvWrLiuwh2d4dqXBFE44py6qg7r3C1lHzWtWOOBPcTfskuZmxXOXyBeYl-81TuP9mrTXjET_AY5Tu-Kt4P3WzcNxNPSXlgyxIfsJnQcWgicICp6vq6ypxVxZDP9o48_mi7FKo0dBYeoe6lD6c-0GSExxfnL1FDZ5tOW9RGr2G0ZdwPzlAk-TiwKfjeNttzwtvOhPY5yeegX52aMNt1SlPQFoVevoTV_ExwYmqtTUEpap0I6hjaK8L53DWJBEx9ZKMoCFgQ5V5GND714VtLvTlWZfGd_33oN9CbqxHoY6A4jvESsQZCkD9kKd5RD3COH_LsZaBD_B2JStBFUa1rkTV0xMs86MH4GU=
+          created_at: 1792683151
+          metadata: {}
+          model: gpt-5-nano-2025-08-07
+          object: response
+          output: []
+          parallel_tool_calls: true
+          temperature: 1.0
+          tool_choice: auto
+          tools: []
+          top_p: 1.0
+          max_output_tokens: 256
+          reasoning:
+            context: current_turn
+            effort: minimal
+            mode: standard
+            summary: null
+          status: in_progress
+          text:
+            format:
+              type: text
+            verbosity: medium
+          truncation: disabled
+          store: false
+          background: false
+          frequency_penalty: 0.0
+          presence_penalty: 0.0
+          prompt_cache_retention: in_memory
+          service_tier: auto
+          tool_usage:
+            image_gen:
+              input_tokens: 0
+              input_tokens_details:
+                image_tokens: 0
+                text_tokens: 0
+              output_tokens: 0
+              output_tokens_details:
+                image_tokens: 0
+                text_tokens: 0
+              total_tokens: 0
+            web_search:
+              num_requests: 0
+          top_logprobs: 0
+        sequence_number: 1
+        model: openai/openai/gpt-5-nano
+      - type: response.output_item.added
+        output_index: 0
+        item:
+          id: rs_0af727036df7a434016ada2c8ffd7087d182352b243a02c209
+          type: reasoning
+          content: []
+          encrypted_content: litellm_enc:bW9kZWxfaWQ6b3BlbmFpL29wZW5haS9ncHQtNS1uYW5v;gAAAAABq2iyPwNbuns_Y8yxd3FlUNrFTiPJDtcJBjzen8b5IUSd9hYJ8fGLazY3yl69HL-TLvOXosVYc2vHok62YfH6tDKvSpR0kIQLqDz7ZGn6iMReN-5ZAY8WmrxEbK6t9t6glbUSp7q3WvzaS019aqEIRIz3fqb1Iv0JzbQGMKqTAN7EYqkJuNVtRU9BSDozjiPPqaG2jOKcfGF549bFwoncr8M0UlDqR6dPB2TdX0iEtBizDIUCC8ao2sKaAaivypECRBtdWXCEQVvhI7Gg5bEfjA--_Tdkp-DISkShwKPWnQtrAD0bP5ktmMFUUOG_bhSW1SmKFHu2owSXDgXor5VnlH9q4zbSs5GCEWrqbpn3qgHuE5UNDjDLZpWSJjdiqZSu1IFd7OgBm7jYMP0WGU5erWuAOrNFE7foW8up4Xfwspdn6FE2K6maY7NgJd0Wvv_Y7NLme89hh3gwBtgUqbiJ4t6jMxbHGaa2Q2j4Tnw8l2JECMa3lSbBC1eNJ8Qjdx4v7NdYUoY-HCdRJHpqUYWSEfgyndRORhMYuDJi_tEop5FUIKDmeEHWpztiYrAJOoHIoaQ3p3VTTMD9gZHor1Fu1B7eH4CfAZT_gI46nyCMi6o_MHHFi-wVTP6fm3baxEFXk08_c3t_DX5YOcWPAAvDJUBpuR0Bx2SgWMD438k973yj1pCnYTqyH-2fLJ5ORhMR9iXCflC3Pd6nJEE77GvXX4UJuoUOCPCTcvGuU6UpQY8GJwJ1-9mUoolbGG_rE60jKj9Q9SN0J8NMt2aQpn0_tgkzTe3HFhCM0TSQgZeLxUmG4s2Mmwv1mYr_ne9w7bHK93uVlt_7Tsr4LKz2uZJHdOcZ1Uhvej6qo4DZNwPhgOk4IUhX0r6pJ1FYKd0gXTbmrplDGBB3fhoRF1vFqXztzpRNArVcnBnvcZ1p6nzydtmNd4t_23j4rW3Ayh59BRxNIH9d5twzsmcEaxzvgvpVpRXKnsRKbzns1US3EzBkg34HBHKK1mdEfwFFXJ9PsM12yRjyGDgzCkreGmv-IcgkNGpEKMdewFhoNWgQtCU9Qmm9W9cUGdRcUytLPi4X5A2mAtdS9uZW2_x6gWX-1lINSSiBIuQaV08QsXoFdQxTqGB_MbXEiNMMV_mCMv_mkyD5CMSNdaat9xm21n7swpvyXlbdMfGk1-sgbuMfoM9qjpS7_Dd_fMEkb4Hnjz_VYntOTCGnk
+          summary: []
+        sequence_number: 2
+        model: openai/openai/gpt-5-nano
+      - type: response.output_item.done
+        output_index: 0
+        sequence_number: 3
+        item:
+          id: rs_0af727036df7a434016ada2c8ffd7087d182352b243a02c209
+          type: reasoning
+          content: []
+          encrypted_content: litellm_enc:bW9kZWxfaWQ6b3BlbmFpL29wZW5haS9ncHQtNS1uYW5v;gAAAAABq2iyQDqIBqWk6Tjo6FHThaBTcuiSnMd7cjADQLh-4vvgO9dgvU282Sdy5bEHrmWVBMfOaIzeJwEhEKaLoRIqNvdiFXJiYqm7ehyHW2_2Gc-bLxC9xOvpIlXbOetLymFZjpmyVfvHu8TAgbwYzSNFiau5eOSflrSMKa8Wr79baHORWRUCU1lYuJt_7M7Y3TixirFzXcnI2a8aYGbMWp_5CERF5o9p0MFwI43AAv2LkMErDkc743NWKlq3lx9k4aG4HSLIzstpghWXcR9aqhGAHWk8z5P1TIbLeyuhtbI671VdxRN7KhX24OiJ8_eFTVZX3fj5FZLMfYhiSOvUBKknQdEVvMsUdaitdnnghsw5R3RH46UMb7O8_VhJtc1gWuhCnerYe_kwoINpu4vMuhmQHg4JtibkxQsnyDBmzwhJYVXlPG66M6DlKknQqTOg7DcjSyqOma-FBFpf0_Mr85r9X7FlI3K504BlKMV0bZfmOfJLXBUXD-iFD5WqWryJbbKwsUe-S6X0iCSFrfoqDsE6rILzigAT-Id-m80xX7FCmm69Rp03h13aMTCEibo1PiNMcytfMv9FjNDS6q6QDkgvPkG_MjSURsa05qp4ErTx3fEs-GE4ZQ-wY5bwWHTzBP0rdtQRfPWl_rd2eu32D7QXJ45b6up2hSsa7v5L1V639t6RKHUNMAzw0jC1owSX5780Kop5aVq7sIzS1e1mXIW6Y3gPNWMi6zr-am64veOAi4jn8u_sS_B6vCokJ9zdlAllgtBLf2f4wfIiLP08FdJhl2QcDJeFlbFY0yylLq6-9L3eF20ETXaOsBjlKBq4xIKNNDtl9ykrKabDcXu2EzToaVZza7_Ef4yPjnwHHtsRSduzbP2GqC3z2EYudaN2HYsotC56TJFRW-lnlJL83-cE-ZppgiLiWp6621zN0XOPwliUVETf7eFrFCweRmb8RAO2QIVHalel5r1LeNQrRmmEOjyskRwp7H75k6Y5pLfArqCn--QWs7O8-JZKclJFn5hW4Pt1HLF7xhDRptoyQbrv1OlJIRr9Ny_XvANWXmlgso__9AwxxVTGYIkW9RJ6HeetZ2pEO7hN12Flq78Q7I3xCT7YlnyrlrVRcl3WIOoqWUxZkxZdDF9aikRP-8F19NTR1D3TSQ1tK4DWKoM_ZZ4BaxUdtNWf5Pcl5-ulng5hi1P2RfHmRK_St9qs7o26K06vqMzrwu8Jdpr9loct2uBvf-QrpvyJsHHrbgfzzzvxaBM0Avn5r-TWdHcZSEbk330C_y0ONgHo9Uie6dttNG3Hs76Fm0P9iJCnIz4nPapam2PPAwD-QX919aByKVxill7fnj365jWVSL8-YEHikhQ6lt2oc91YINPbm3lBtL2b_06f409GKeWjV4EuPBrKVrg0EKvKxg9eqIbcqJKqOpfQinS5Ghz4DI8ej9CphJSt_xFiOuScssPrgEP_3ntZKO1vKpdJph7sIgpZYbw3xJY2dcQ27LhEvE-wx1FnuSw3wzNo5e3S6JChVMWguuI8hLFQ5nvGo5yBFLJvpTBgnpbwLYw44p-I31qJV5f4P2oah9Rm6SfXHckd3-5RBE06fk3OaniaJSRWxOa6rDN8rp1U9Xtnumac8d0LYmVG0oyrCgEFNqawq0p6zjKkxhmc2zGEVwE2g
+          summary: []
+        model: openai/openai/gpt-5-nano
+      - type: response.output_item.added
+        output_index: 1
+        item:
+          id: msg_0af727036df7a434016ada2c901e7487d189cc129f933eb02f
+          type: message
+          status: in_progress
+          content: []
+          role: assistant
+        sequence_number: 4
+        model: openai/openai/gpt-5-nano
+      - type: response.content_part.added
+        item_id: msg_0af727036df7a434016ada2c901e7487d189cc129f933eb02f
+        output_index: 1
+        content_index: 0
+        part:
+          type: output_text
+          annotations: []
+          logprobs: []
+          text: ''
+        sequence_number: 5
+        model: openai/openai/gpt-5-nano
+      - type: response.output_text.delta
+        item_id: msg_0af727036df7a434016ada2c901e7487d189cc129f933eb02f
+        output_index: 1
+        content_index: 0
+        delta: A
+        logprobs: []
+        obfuscation: DTeEIK1HBdc8eZG
+        sequence_number: 6
+        model: openai/openai/gpt-5-nano
+      - type: response.output_text.delta
+        item_id: msg_0af727036df7a434016ada2c901e7487d189cc129f933eb02f
+        output_index: 1
+        content_index: 0
+        delta: ' calm'
+        logprobs: []
+        obfuscation: kjKPwQaZRPS
+        sequence_number: 7
+        model: openai/openai/gpt-5-nano
+      - type: response.output_text.delta
+        item_id: msg_0af727036df7a434016ada2c901e7487d189cc129f933eb02f
+        output_index: 1
+        content_index: 0
+        delta: ' morning'
+        logprobs: []
+        obfuscation: WuF8VoAO
+        sequence_number: 8
+        model: openai/openai/gpt-5-nano
+      - type: response.output_text.delta
+        item_id: msg_0af727036df7a434016ada2c901e7487d189cc129f933eb02f
+        output_index: 1
+        content_index: 0
+        delta: ' begins'
+        logprobs: []
+        obfuscation: NBLzmdJa4
+        sequence_number: 9
+        model: openai/openai/gpt-5-nano
+      - type: response.output_text.delta
+        item_id: msg_0af727036df7a434016ada2c901e7487d189cc129f933eb02f
+        output_index: 1
+        content_index: 0
+        delta: ' with'
+        logprobs: []
+        obfuscation: AwtcRIPkozp
+        sequence_number: 10
+        model: openai/openai/gpt-5-nano
+      - type: response.output_text.delta
+        item_id: msg_0af727036df7a434016ada2c901e7487d189cc129f933eb02f
+        output_index: 1
+        content_index: 0
+        delta: ' warm'
+        logprobs: []
+        obfuscation: kNsIaNL5MHD
+        sequence_number: 11
+        model: openai/openai/gpt-5-nano
+      - type: response.output_text.delta
+        item_id: msg_0af727036df7a434016ada2c901e7487d189cc129f933eb02f
+        output_index: 1
+        content_index: 0
+        delta: ' sunlight'
+        logprobs: []
+        obfuscation: NISbfwF
+        sequence_number: 12
+        model: openai/openai/gpt-5-nano
+      - type: response.output_text.delta
+        item_id: msg_0af727036df7a434016ada2c901e7487d189cc129f933eb02f
+        output_index: 1
+        content_index: 0
+        delta: ','
+        logprobs: []
+        obfuscation: gXezQXDOE1JzQqZ
+        sequence_number: 13
+        model: openai/openai/gpt-5-nano
+      - type: response.output_text.delta
+        item_id: msg_0af727036df7a434016ada2c901e7487d189cc129f933eb02f
+        output_index: 1
+        content_index: 0
+        delta: ' a'
+        logprobs: []
+        obfuscation: jsIvgUghlkvFax
+        sequence_number: 14
+        model: openai/openai/gpt-5-nano
+      - type: response.output_text.delta
+        item_id: msg_0af727036df7a434016ada2c901e7487d189cc129f933eb02f
+        output_index: 1
+        content_index: 0
+        delta: ' quiet'
+        logprobs: []
+        obfuscation: lturbvQNZ3
+        sequence_number: 15
+        model: openai/openai/gpt-5-nano
+      - type: response.output_text.delta
+        item_id: msg_0af727036df7a434016ada2c901e7487d189cc129f933eb02f
+        output_index: 1
+        content_index: 0
+        delta: ' cup'
+        logprobs: []
+        obfuscation: qT6P9BeKEhfm
+        sequence_number: 16
+        model: openai/openai/gpt-5-nano
+      - type: response.output_text.delta
+        item_id: msg_0af727036df7a434016ada2c901e7487d189cc129f933eb02f
+        output_index: 1
+        content_index: 0
+        delta: ' of'
+        logprobs: []
+        obfuscation: Dqhx2jm267FwL
+        sequence_number: 17
+        model: openai/openai/gpt-5-nano
+      - type: response.output_text.delta
+        item_id: msg_0af727036df7a434016ada2c901e7487d189cc129f933eb02f
+        output_index: 1
+        content_index: 0
+        delta: ' tea'
+        logprobs: []
+        obfuscation: hORHkbBxyOnz
+        sequence_number: 18
+        model: openai/openai/gpt-5-nano
+      - type: response.output_text.delta
+        item_id: msg_0af727036df7a434016ada2c901e7487d189cc129f933eb02f
+        output_index: 1
+        content_index: 0
+        delta: ','
+        logprobs: []
+        obfuscation: FgeL5fOIh8OF16E
+        sequence_number: 19
+        model: openai/openai/gpt-5-nano
+      - type: response.output_text.delta
+        item_id: msg_0af727036df7a434016ada2c901e7487d189cc129f933eb02f
+        output_index: 1
+        content_index: 0
+        delta: ' and'
+        logprobs: []
+        obfuscation: Etur33qOcFKF
+        sequence_number: 20
+        model: openai/openai/gpt-5-nano
+      - type: response.output_text.delta
+        item_id: msg_0af727036df7a434016ada2c901e7487d189cc129f933eb02f
+        output_index: 1
+        content_index: 0
+        delta: ' a'
+        logprobs: []
+        obfuscation: bLyKpBmXfn62vj
+        sequence_number: 21
+        model: openai/openai/gpt-5-nano
+      - type: response.output_text.delta
+        item_id: msg_0af727036df7a434016ada2c901e7487d189cc129f933eb02f
+        output_index: 1
+        content_index: 0
+        delta: ' friendly'
+        logprobs: []
+        obfuscation: eVW9r8l
+        sequence_number: 22
+        model: openai/openai/gpt-5-nano
+      - type: response.output_text.delta
+        item_id: msg_0af727036df7a434016ada2c901e7487d189cc129f933eb02f
+        output_index: 1
+        content_index: 0
+        delta: ' hello'
+        logprobs: []
+        obfuscation: RZejUjVLX5
+        sequence_number: 23
+        model: openai/openai/gpt-5-nano
+      - type: response.output_text.delta
+        item_id: msg_0af727036df7a434016ada2c901e7487d189cc129f933eb02f
+        output_index: 1
+        content_index: 0
+        delta: .
+        logprobs: []
+        obfuscation: umPuFkhpEHTnb9c
+        sequence_number: 24
+        model: openai/openai/gpt-5-nano
+      - type: response.output_text.done
+        item_id: msg_0af727036df7a434016ada2c901e7487d189cc129f933eb02f
+        output_index: 1
+        content_index: 0
+        text: A calm morning begins with warm sunlight, a quiet cup of tea, and a friendly hello.
+        logprobs: []
+        sequence_number: 25
+        model: openai/openai/gpt-5-nano
+      - type: response.content_part.done
+        item_id: msg_0af727036df7a434016ada2c901e7487d189cc129f933eb02f
+        output_index: 1
+        content_index: 0
+        part:
+          type: output_text
+          text: A calm morning begins with warm sunlight, a quiet cup of tea, and a friendly hello.
+          annotations: []
+          logprobs: []
+        sequence_number: 26
+        model: openai/openai/gpt-5-nano
+      - type: response.output_item.done
+        output_index: 1
+        sequence_number: 27
+        item:
+          id: msg_0af727036df7a434016ada2c901e7487d189cc129f933eb02f
+          type: message
+          status: completed
+          content:
+          - type: output_text
+            annotations: []
+            logprobs: []
+            text: A calm morning begins with warm sunlight, a quiet cup of tea, and a friendly hello.
+          role: assistant
+        model: openai/openai/gpt-5-nano
+      - type: response.completed
+        response:
+          id: resp_TMRxC5wFVGCFMCfGeY6bcn3tN6iXKeHRMthYw0ybBPdaSKq_wkRimClUUcEqjIWxsr38a9uKSjillpcOvWrLiuwh2d4dqXBFE44py6qg7r3C1lHzWtWOOBPcTfskuZmxXOXyBeYl-81TuP9mrTXjET_AY5Tu-Kt4P3WzcNxNPSXlgyxIfsJnQcWgicICp6vq6ypxVxZDP9o48_mi7FKo0dBYeoe6lD6c-0GSExxfnL1FDZ5tOW9RGr2G0ZdwPzlAk-TiwKfjeNttzwtvOhPY5yeegX52aMNt1SlPQFoVevoTV_ExwYmqtTUEpap0I6hjaK8L53DWJBEx9ZKMoCFgQ5V5GND714VtLvTlWZfGd_33oN9CbqxHoY6A4jvESsQZCkD9kKd5RD3COH_LsZaBD_B2JStBFUa1rkTV0xMs86MH4GU=
+          created_at: 1792683151
+          metadata: {}
+          model: gpt-5-nano-2025-08-07
+          object: response
+          output:
+          - id: encitem_bGl0ZWxsbTptb2RlbF9pZDpvcGVuYWkvb3BlbmFpL2dwdC01LW5hbm87aXRlbV9pZDpyc18wYWY3MjcwMzZkZjdhNDM0MDE2YWRhMmM4ZmZkNzA4N2QxODIzNTJiMjQzYTAyYzIwOQ==
+            summary: []
+            type: reasoning
+            content: []
+            encrypted_content: litellm_enc:bW9kZWxfaWQ6b3BlbmFpL29wZW5haS9ncHQtNS1uYW5v;gAAAAABq2iyQO1PU21acI1emWOFbQHpnNcU3bR8yF1xTobH3kdOHLWhXM6YsrR7z7f5wZqehNWyVN96hTCfdMmLjnXssqxItv9Dcb1zPvuVAtltEuIPRBlFO4kJ1ET9BM3W5fNgnQpDEv5SvqjVA4JrqZImg7WSSHsI1YUrIiprZrxn7AjBa1Y1nhUlXSRQT4w9YkYIjxAL05OCySLGKjEe4t-1-6fbyHNl8QX6Cz1--yivJ8lgtUAJ3cguv39FhqGwCZm9K3D7L1p17A1FjqifZhrACmzvwxj1Feu8CXEUCKOS_s6szmdAlAHTHyeZpu8aGF_osScGEUa8Dr4gaTMOo6EcEIIekpkWag0XJINzPiAi_-1HBnQXOQmobJfxGKAgiTENhqBpTJ-h1iFzUpELy3V8cy3bRm9N2_tPPWb0Za8auGpp2hvnoFAYLLTHcXQbd1BKOshIjiXp7fhae285TgMcgldYyEtgaVhHumUSikmiflM7FTYtkXAQcLqvo1LXLIYX_Liq0JXoEBq7BAYZP-V83jy5tmM2Nsnl8HzlnoxsCZBDCMDIfOwJEaDp1CPirZr6OLyUXGNGotZgSFOC4I6pZmIq1yZeKTOvHKuF1yhBm9nNA1Zzr2TWs3pI1N2up0BxalNO_77ILFEYWkBc7m_jFmpdKL77w87I8BR668dlrT3U-q9YCqO1Y1LdQAIw4u8JfqoKnXaQoR41icw6QTiwNHgGeiYz_8zUK4m5Zy_-CoTrSZhRx5ZwfLW_2tWh1Y-wcp7U2vmkndSh4FAUMcobIORcErGtW9ztUVLtpwm1Dht2azIoNFsy0wx7V_o1T93ZOqHDIirsc-G9bym1x510k39OyY6XwSKW9FhFqxWEzk9mYGCSYe_1ZY_U9gh8NYPR4DboNhXdjuHIhpLhX8Wq0V_WjWVMMbWO6GHKUq4Nh7sTDbxHOvpEPXw6-DcDr0NSa3WQBb7KwV98n7-E8KPYfnjslIhUjZz8jUzXjx3Kg1DpEUouAua-C-QOy20DyRWqVZUmG4nJYoMAjHrNUssvPH-rlpC3JJyAM20F5Esv994qPAeF51J0bFuth7mWz5RvaPwOy8-qfXvOtTrAqGv-abeydXKUdTEFvSe-F65_BI2xiqXWV7UZUzXvWue1dQKh5vmz93YK_ecRd970e7mQf7P4BU9XKFIm65nIze05DMbczzMuMMHZB8I_RXE4mti1_2Zt8Ac8G9rqDHUOGPw-c9uE69ofPjQzlkkpSMhOG7O8BIgedcbkKrj3-01uE-Nxh1wfQb2Pm5VBdRwfSubA_ooVWmCPQ2QAyoyZ4srJpSfn1wa_RB1rC775A8P0a7ydLTBiH4xD50Q5pcBJbM0BNxfPEYUvo9KAzFni_frPpyC0E0x8kQe2TFbRKd_XESWUqe1XDlko-YjbghGAj7Ap1FfNh0CqN07xFKBRsbijZgXzvqdNc0WDLkjfsPNjnkN3Lrs-zK7O3HWK2MPiYr0kpKNsDTui6JBHkadkyfcXMMLE92_73YI4TgUxv9Fkg49CRUW7WDXORUEIKCssGwhhO9MIHYtbpOGW-rvspt8etriTkRPe1AzgxeVg8ulY00_qhYOj5FXY3AlEj4j0CwI_atvH5vCTT9sPY-xIh1tJO0uYqgkUcHviTM-nAdrKbWkTqFjnr
+          - id: msg_0af727036df7a434016ada2c901e7487d189cc129f933eb02f
+            content:
+            - annotations: []
+              text: A calm morning begins with warm sunlight, a quiet cup of tea, and a friendly hello.
+              type: output_text
+              logprobs: []
+            role: assistant
+            status: completed
+            type: message
+          parallel_tool_calls: true
+          temperature: 1.0
+          tool_choice: auto
+          tools: []
+          top_p: 1.0
+          max_output_tokens: 256
+          reasoning:
+            context: current_turn
+            effort: minimal
+            mode: standard
+            summary: null
+          status: completed
+          text:
+            format:
+              type: text
+            verbosity: medium
+          truncation: disabled
+          usage:
+            input_tokens: 29
+            input_tokens_details:
+              cached_tokens: 0
+              cache_write_tokens: 0
+            output_tokens: 37
+            output_tokens_details:
+              reasoning_tokens: 0
+            total_tokens: 66
+            cost: 1.1927499999999999e-05
+          store: false
+          background: false
+          completed_at: 1792683152
+          frequency_penalty: 0.0
+          presence_penalty: 0.0
+          prompt_cache_retention: in_memory
+          service_tier: default
+          tool_usage:
+            image_gen:
+              input_tokens: 0
+              input_tokens_details:
+                image_tokens: 0
+                text_tokens: 0
+              output_tokens: 0
+              output_tokens_details:
+                image_tokens: 0
+                text_tokens: 0
+              total_tokens: 0
+            web_search:
+              num_requests: 0
+          top_logprobs: 0
+        sequence_number: 28
+        model: openai/openai/gpt-5-nano
+      - '[DONE]'

@@ -1,0 +1,45 @@
+version: 1
+interactions:
+- request:
+    method: POST
+    uri: https://inference-api.nvidia.com/v1/responses
+    headers:
+      host:
+      - inference-api.nvidia.com
+      accept:
+      - '*/*'
+      connection:
+      - keep-alive
+      user-agent:
+      - python-httpx/0.28.1
+      accept-encoding:
+      - identity
+      content-type:
+      - application/json
+    parsed_body:
+      model: openai/openai/recorded-invalid-model
+      input: 'Reply with exactly: Hello.'
+      stream: true
+      store: false
+      max_output_tokens: 256
+      reasoning:
+        effort: minimal
+  response:
+    status:
+      code: 403
+      message: Forbidden
+    headers:
+      content-type:
+      - application/json
+      connection:
+      - keep-alive
+      content-security-policy:
+      - frame-ancestors 'none'
+    body:
+      parsed_body:
+        error:
+          message: The requested model 'openai/openai/recorded-invalid-model' is not available for this API key, or the model
+            name is invalid. Check the models available to you and try again.
+          type: key_model_access_denied
+          param: model
+          code: '403'

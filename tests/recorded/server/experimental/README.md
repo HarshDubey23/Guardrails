@@ -6,7 +6,7 @@ They exercise the router, projections, stream classifier/hooks, and HTTP
 dispatcher. A configurable checker double supplies synthetic decisions; this
 is not evidence that a real Rails configuration produces those verdicts.
 
-## Current Chat coverage
+## Coverage and organization
 
 The [native Chat suite](openai/test_chat_completions.py) selects the native OpenAI
 endpoint for direct OpenAI recordings. The
@@ -39,6 +39,21 @@ remain separate evidence rather than requiring duplicate prompts in every suite.
 | First streaming window blocked | No provider payload events escape; the proxy emits a blocking error and Chat terminal marker. |
 | Later streaming window blocked | Only the approved provider event prefix escapes, followed by the blocking error and terminal marker. No rejected or subsequent provider payload is released. |
 | Overlapping streaming context | Checker inputs include the configured preceding context; that context is not duplicated in released events. |
+
+All four modules cover those scenarios. Cassette counts differ because archived
+examples are retained and the short LiteLLM Responses stream needs a longer
+companion capture for overlapping windows:
+
+| Module | Cassettes | Replay cases | Additional evidence |
+| --- | ---: | ---: | --- |
+| `test_chat_completions.py` | 4 | 9 | Native success and invalid-model errors in both modes. |
+| `test_responses.py` | 4 | 9 | Native success and invalid-model errors in both modes. |
+| `test_litellm_chat_completions.py` | 6 | 11 | Two archived alternate-prompt successes. |
+| `test_litellm_responses.py` | 5 | 10 | A longer successful stream for overlapping windows. |
+
+Counts exclude conformance tests. Error cases cover HTTP error responses requested
+with either `stream` value; they are not recorded failures after streaming begins.
+Synthetic malformed-stream and SSE-error cases stay in unit/conformance suites.
 
 The input-block/no-dispatch invariant is already covered by the offline router
 integration in `tests/server/experimental/test_provider_transport.py`. It does
@@ -113,6 +128,36 @@ Blocking tests reference the existing successful cassettes and force
 `record_mode="none"`. They cannot refresh or manufacture evidence. Refresh the
 original success tests when authorized; do not create separate provider
 recordings for synthetic safety verdicts.
+
+## LiteLLM Responses follow-up captures
+
+Three additional cassettes were captured on 2026-10-22 from
+`https://inference-api.nvidia.com/v1/responses`, using `NVIDIA_INFERENCE_KEY`:
+
+- `test_invalid_model_preserves_provider_error[buffered|streaming].yaml` uses
+  `openai/openai/recorded-invalid-model`. Both requests return HTTP 403 with
+  `key_model_access_denied`; the requested model is outside the key's allowed
+  routes. These are genuine gateway errors, not native OpenAI 404 responses.
+- `test_success_preserves_policy_and_wire[streaming-long-output].yaml` requests
+  and returns model `openai/openai/gpt-5-nano`, with minimal reasoning,
+  `store: false`, and a 256-token output limit. The benign longer greeting
+  produces 19 text deltas, enough to block a later two-delta window with one
+  preceding delta of context. The original two-delta stream remains unchanged.
+
+The existing reviewed source baseline remains LiteLLM commit
+`d665dc1a6315847fcad6cc2c1264ceb47c06abce`, with the native OpenAI comparison pin
+`df63773f69f542ef875b9f00c3837c25ba5f4f2a`. These new captures do not identify the
+current serving LiteLLM version and contain no `openai-version` header. No
+original cassette was refreshed or altered. Blocking decisions remain synthetic,
+and all blocking tests force offline replay of a genuine successful exchange.
+
+A focused capture/replay command for these additional cases is:
+
+```bash
+make record-cassettes \
+  RECORDED_TESTS="tests/recorded/server/experimental/openai/test_litellm_responses.py::test_invalid_model_preserves_provider_error tests/recorded/server/experimental/openai/test_litellm_responses.py::test_success_preserves_policy_and_wire[streaming-long-output]" \
+  RECORDED_REQUIRED_KEYS=NVIDIA_INFERENCE_KEY
+```
 
 ## Pattern for another operation or provider
 
