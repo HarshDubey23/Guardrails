@@ -124,11 +124,16 @@ def test_recorded_cassette_serializer_keeps_json_bodies_readable():
     assert ReadableYamlSerializer.deserialize(text)["interactions"][0]["response"]["body"]["string"].startswith("{")
 
 
-def test_recorded_cassette_sanitization_removes_provider_wrapped_headers():
+@pytest.mark.parametrize("version_header", ["openai-version", "OpenAI-Version", "OPENAI-VERSION"])
+def test_recorded_cassette_sanitization_preserves_version_and_removes_private_headers(version_header):
     response = before_record_response(
         {
             "headers": {
                 "Content-Type": ["application/json"],
+                version_header: ["2020-10-01"],
+                "x-request-id": ["private-request-id"],
+                "openai-organization": ["private-organization"],
+                "Date": ["Wed, 21 Oct 2026 17:00:00 GMT"],
                 "llm_provider-openai-project": ["provider-project"],
                 "llm_provider-set-cookie": ["private-cookie"],
             },
@@ -136,7 +141,7 @@ def test_recorded_cassette_sanitization_removes_provider_wrapped_headers():
         }
     )
 
-    assert response["headers"] == {"Content-Type": ["application/json"]}
+    assert response["headers"] == {"Content-Type": ["application/json"], version_header: ["2020-10-01"]}
 
 
 def test_recorded_cassette_serializer_handles_null_interactions():
@@ -262,7 +267,7 @@ def test_recorded_cassette_serializer_filters_headers_by_prefix():
     assert "x-request-id" not in headers
     assert "X-Content-Type-Options" not in headers
     assert "cf-cache-status" not in headers
-    assert "openai-version" not in headers
+    assert headers["openai-version"] == ["2020-10-01"]
 
     request = before_record_request(
         Request(

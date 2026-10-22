@@ -31,6 +31,19 @@ asserts precisely these validation differences. Recordings and source bytes
 remain unchanged. Any new difference requires review; tests do not silently
 normalize payloads or weaken the independent source validator.
 
+The official [buffered response reference](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create)
+and [streaming reference](https://developers.openai.com/api/reference/resources/chat/subresources/completions/streaming-events),
+checked on 2026-10-22, retain the same restrictions: buffered `logprobs` is
+required and nullable, while `system_fingerprint` is an optional string.
+The discrepancy is not established to be an outdated pin; its upstream cause
+remains unconfirmed.
+
+A passing discrepancy test means the recording has exactly the documented
+schema errors, not that it conforms to the schema. Separate replay tests verify
+runtime compatibility: omitted or null `logprobs` is accepted, populated
+logprobs is rejected under inspection, and `system_fingerprint` is preserved
+as opaque metadata. Synthetic source-valid cases still validate independently.
+
 ## Coverage and boundaries
 
 - `test_schema.py` audits every native bound model against source properties,

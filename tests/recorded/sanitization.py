@@ -33,7 +33,7 @@ FILTERED_QUERY_PARAMETERS = ("api_key", "key", "token")
 
 FILTERED_HEADER_PREFIXES = ("x-", "cf-", "openai-", "llm_provider-")
 
-ALLOWED_HEADERS = {"content-type"}
+ALLOWED_HEADERS = {"content-type", "openai-version"}
 
 VOLATILE_RESPONSE_HEADERS = {
     "content-length",

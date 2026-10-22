@@ -63,9 +63,24 @@ make replay-cassettes \
   RECORDED_TESTS=tests/recorded/server/experimental/openai/test_chat_completions.py
 ```
 
-The shared sanitizer is unchanged; replay equivalence refers to sanitized bytes,
-not network chunking or live delivery timing. No additional SDK dependency is
-required. Gateway recordings retain their separate provenance and credential.
+The capture sanitizer preserves a null `system_fingerprint`, substitutes a
+placeholder for non-null fingerprints, and does not remove `logprobs`.
+The [Chat conformance guide](../../../server/experimental/conformance/openai/chat_completions/README.md#pinned-source-discrepancies)
+documents the observed differences from the pinned schema and current reference.
+
+Future captures preserve `openai-version` when returned. This API version does
+not identify an exact OpenAPI revision or freeze response fields; see the
+[API version and compatibility documentation](https://developers.openai.com/api/reference/overview).
+Record the capture date, endpoint, requested and returned model, and comparison
+schema revision in the capture provenance. Keep request IDs privately when
+needed for provider support; request IDs, organization headers, and response
+dates remain filtered from committed cassettes. The existing 2026-10-21 captures
+predate version-header retention and remain unchanged; their removed headers
+cannot be recovered from these recordings.
+
+Replay equivalence refers to sanitized bytes, not network chunking or live
+delivery timing. No additional SDK dependency is required. Gateway recordings
+retain their separate provenance and credential.
 
 ## Native Responses coverage
 
