@@ -148,14 +148,7 @@ def sse_bytes(*events):
 def recorded_exchange(stream, *, gateway=False):
     module = "test_litellm_chat_completions" if gateway else "test_chat_completions"
     directory = Path(__file__).parents[5] / "recorded/server/experimental/openai/cassettes" / module
-    if gateway:
-        name = (
-            "test_streaming_chat_preserves_declared_events_and_opaque_metadata"
-            if stream
-            else "test_buffered_chat_preserves_guarded_constrained_and_opaque_contract_fields"
-        )
-    else:
-        name = f"test_native_chat_preserves_policy_and_wire[{'streaming' if stream else 'buffered'}]"
+    name = f"test_success_preserves_policy_and_wire[{'streaming' if stream else 'buffered'}]"
     (interaction,) = cassette_with_rehydrated_bodies(
         yaml.safe_load((directory / f"{name}.yaml").read_text(encoding="utf-8"))
     )["interactions"]

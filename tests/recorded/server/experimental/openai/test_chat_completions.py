@@ -32,10 +32,9 @@ from nemoguardrails.server.experimental._content_checker import (
     ContentInspectionPolicy,
     StreamBufferingPolicy,
 )
-from nemoguardrails.server.experimental.provider.sse import iter_sse_events
 from nemoguardrails.server.experimental.providers.openai.chat_completions.endpoint import CHAT_COMPLETIONS_ENDPOINT
 from tests.recorded.cassette import cassette_request_jsons
-from tests.recorded.server.experimental.openai.chat_support import BLOCKED_ERROR, stream_events
+from tests.recorded.server.experimental.openai.chat_support import BLOCKED_ERROR, raw_stream_events, stream_events
 from tests.recorded.server.experimental.openai.chat_support import recorded_proxy as chat_proxy
 from tests.recorded.server.experimental.openai.chat_support import single_upstream_exchange as single_upstream_exchange
 from tests.server.experimental.checkers import StaticChecker
@@ -49,8 +48,8 @@ pytestmark = [
 NATIVE_BASE_URL = "https://api.openai.com/v1"
 NATIVE_MODEL = "gpt-5-nano-2025-08-07"
 NATIVE_INPUT = "Reply with exactly: Hello, recorded Chat!"
-NATIVE_BUFFERED_RECORDING = "test_native_chat_preserves_policy_and_wire[buffered].yaml"
-NATIVE_STREAMING_RECORDING = "test_native_chat_preserves_policy_and_wire[streaming].yaml"
+NATIVE_BUFFERED_RECORDING = "test_success_preserves_policy_and_wire[buffered].yaml"
+NATIVE_STREAMING_RECORDING = "test_success_preserves_policy_and_wire[streaming].yaml"
 
 recorded_proxy = partial(chat_proxy, endpoint=CHAT_COMPLETIONS_ENDPOINT, base_url=NATIVE_BASE_URL)
 
@@ -79,20 +78,13 @@ async def capture_native(api_key, request):
         )
 
 
-async def native_events(body):
-    async def chunks():
-        yield body
-
-    return [event async for event in iter_sse_events(chunks(), max_event_bytes=1024 * 1024)]
-
-
 def assert_single_replay(vcr):
     assert len(vcr.requests) == vcr.play_count == 1
     assert vcr.all_played
 
 
 @pytest.mark.parametrize("stream", [False, True], ids=["buffered", "streaming"])
-async def test_native_chat_preserves_policy_and_wire(openai_api_key, record_mode, recorded_cassette_path, vcr, stream):
+async def test_success_preserves_policy_and_wire(openai_api_key, record_mode, recorded_cassette_path, vcr, stream):
     request = native_request(stream)
     upstream = await capture_native(openai_api_key, request)
     assert upstream.status_code == 200
@@ -137,9 +129,7 @@ async def test_native_chat_preserves_policy_and_wire(openai_api_key, record_mode
 
 
 @pytest.mark.parametrize("stream", [False, True], ids=["buffered", "streaming"])
-async def test_native_chat_provider_error_is_preserved(
-    openai_api_key, record_mode, recorded_cassette_path, vcr, stream
-):
+async def test_invalid_model_preserves_provider_error(openai_api_key, record_mode, recorded_cassette_path, vcr, stream):
     request = native_request(stream, model="recorded-invalid-chat-model")
     upstream = await capture_native(openai_api_key, request)
     assert upstream.status_code == 404
@@ -161,7 +151,7 @@ async def test_native_chat_provider_error_is_preserved(
 
 
 @pytest.mark.vcr(NATIVE_BUFFERED_RECORDING, record_mode="none")
-async def test_native_recorded_chat_buffered_block_withholds_output(openai_api_key, vcr):
+async def test_buffered_output_is_withheld_on_block(openai_api_key, vcr):
     upstream = await capture_native(openai_api_key, native_request(False))
     assert_single_replay(vcr)
     text = upstream.json()["choices"][0]["message"]["content"]
@@ -181,12 +171,10 @@ async def test_native_recorded_chat_buffered_block_withholds_output(openai_api_k
 @pytest.mark.vcr(NATIVE_STREAMING_RECORDING, record_mode="none")
 @pytest.mark.parametrize("allowed_windows", [0, 1], ids=["first-window", "later-window"])
 @pytest.mark.parametrize("chunk_size,context_size", [(1, 0), (2, 1)], ids=["single-delta", "overlapping-context"])
-async def test_native_recorded_chat_stream_releases_only_approved_prefix(
-    openai_api_key, vcr, allowed_windows, chunk_size, context_size
-):
+async def test_stream_releases_only_approved_prefix(openai_api_key, vcr, allowed_windows, chunk_size, context_size):
     upstream = await capture_native(openai_api_key, native_request(True))
     assert_single_replay(vcr)
-    events = await native_events(upstream.content)
+    events = await raw_stream_events(upstream.content)
     text_events = [
         (index, choice["delta"]["content"])
         for index, event in enumerate(events)
@@ -208,7 +196,7 @@ async def test_native_recorded_chat_stream_releases_only_approved_prefix(
     assert_single_replay(vcr)
     assert len(dispatched) == 1
     assert response.status_code == 200
-    received = await native_events(response.content)
+    received = await raw_stream_events(response.content)
     assert [event.raw for event in received[:-2]] == [event.raw for event in events[:released_end]]
     assert json.loads(received[-2].data) == BLOCKED_ERROR
     assert received[-1].data == b"[DONE]"

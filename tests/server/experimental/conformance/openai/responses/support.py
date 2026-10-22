@@ -39,11 +39,7 @@ ENDPOINTS = [pytest.param(RESPONSES_ENDPOINT, id="openai"), pytest.param(LITELLM
 def recording(stream, *, gateway=False):
     mode = "streaming" if stream else "buffered"
     directory = "test_litellm_responses" if gateway else "test_responses"
-    name = (
-        "test_gateway_responses_preserve_policy_and_wire"
-        if gateway
-        else "test_native_responses_preserve_policy_and_wire"
-    )
+    name = "test_success_preserves_policy_and_wire"
     path = RECORDINGS / directory / f"{name}[{mode}].yaml"
     (interaction,) = cassette_with_rehydrated_bodies(yaml.safe_load(path.read_text(encoding="utf-8")))["interactions"]
     assert interaction["response"]["status"]["code"] == 200

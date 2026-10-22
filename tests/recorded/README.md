@@ -141,7 +141,7 @@ acceptance gate. Responses uses the same shared sanitizer as Chat, with no extra
 content redaction; encrypted content and nested item-ID relationships are retained.
 These two cassettes establish neither Chat bridge nor arbitrary-backend compatibility.
 
-These six cassettes predate the dialect: their provider payloads are unchanged.
+The six archived LiteLLM Chat cassettes predate the dialect: their provider payloads are unchanged.
 Two buffered successes contain message `provider_specific_fields: {refusal: null}`
 and empty choice extensions. Two streaming successes contain no extension bags;
 the other two responses are provider errors. The inventory tests validate every
@@ -202,7 +202,9 @@ tests/recorded/server/experimental/<provider>/cassettes/<test_module>/<test_name
 
 Parameterized tests include the parameter id in the cassette filename. Every test (rails and clients) uses this default naming; do not add `@pytest.mark.default_cassette(...)`.
 
-JSON request and response bodies are stored as `parsed_body` and rehydrated by `ReadableYamlSerializer` during replay. SSE responses also use parseable `parsed_body` events.
+JSON request and response bodies are stored as `parsed_body` and rehydrated by `ReadableYamlSerializer` during replay. SSE responses use `parsed_body` events only when the shared serializer can
+rehydrate their framing faithfully. Other SSE bodies retain `string` storage,
+including native Responses streams with named `event:` lines.
 
 Cassettes preserve scrubbed JSON text without smart-character normalization so provider payloads stay inspectable. Request matching and snapshot helpers normalize smart quotes, dash variants, ellipses, and NFKC at comparison time. Response headers are dropped by exact name and by prefix (`x-`, `cf-`, `openai-`); `tests/recorded/sanitization.py` holds the `ALLOWED_HEADERS` exceptions that must survive the prefix sweep (currently `content-type` and `openai-version`).
 

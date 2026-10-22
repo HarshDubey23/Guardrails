@@ -22,6 +22,14 @@ Recorded modules use `test_{operation}.py` for native OpenAI and
 cassettes live under `openai/cassettes/{module_stem}/`. Responses follows the
 same convention with `test_responses.py` and `test_litellm_responses.py`.
 
+Equivalent scenarios use the same test names in each module:
+`test_success_preserves_policy_and_wire[buffered|streaming]`,
+`test_invalid_model_preserves_provider_error[buffered|streaming]`,
+`test_buffered_output_is_withheld_on_block`, and
+`test_stream_releases_only_approved_prefix`. The module identifies the operation
+and dialect; cassette names follow the test names. Archived alternate prompts
+remain separate evidence rather than requiring duplicate prompts in every suite.
+
 | Scenario | Evidence and assertion |
 | --- | --- |
 | Buffered and streaming allow | Recorded payloads pass the selected boundary; extracted input/output text reaches the checker. |
@@ -43,7 +51,7 @@ enabled, so extra dispatches or HTTP retries cannot reuse the recorded response.
 
 ## Native Chat evidence
 
-Four `test_native_chat_*` cassettes in `openai/cassettes/test_chat_completions/`
+Four native Chat cassettes in `openai/cassettes/test_chat_completions/`
 were captured directly from `https://api.openai.com/v1/chat/completions` on
 2026-10-21: buffered/streaming success and invalid-model errors in both modes.
 The success profile uses `gpt-5-nano-2025-08-07`, one benign greeting, minimal
@@ -66,7 +74,7 @@ To refresh only the four native captures with the credential already available:
 
 ```bash
 make record-cassettes \
-  RECORDED_TESTS="tests/recorded/server/experimental/openai/test_chat_completions.py::test_native_chat_preserves_policy_and_wire tests/recorded/server/experimental/openai/test_chat_completions.py::test_native_chat_provider_error_is_preserved" \
+  RECORDED_TESTS="tests/recorded/server/experimental/openai/test_chat_completions.py::test_success_preserves_policy_and_wire tests/recorded/server/experimental/openai/test_chat_completions.py::test_invalid_model_preserves_provider_error" \
   RECORDED_REQUIRED_KEYS=OPENAI_API_KEY
 make replay-cassettes \
   RECORDED_TESTS=tests/recorded/server/experimental/openai/test_chat_completions.py
@@ -133,6 +141,14 @@ recordings for synthetic safety verdicts.
 Synthetic Chat payload builders live separately in
 [chat_fixtures.py](../../../server/experimental/chat_fixtures.py); these are not
 provider recordings. Tests import support modules, not other test modules.
+
+## Contract checks and conformance
+
+Replay may validate the captured request, response, events, and exported contract
+alongside actual proxy behavior. These assertions establish compatibility with
+that exchange. Conformance separately audits source field coverage, classification
+decisions, dialect boundaries, and synthetic variations. Export agreement is a
+secondary consistency check, not independent proof of a correct policy.
 
 ## Evidence limits and complementary tests
 

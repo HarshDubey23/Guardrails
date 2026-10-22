@@ -23,6 +23,7 @@ from fastapi import FastAPI
 
 from nemoguardrails.server.experimental._provider_transport import ProviderTransport
 from nemoguardrails.server.experimental.provider.integration import UpstreamSettings
+from nemoguardrails.server.experimental.provider.sse import iter_sse_events
 from nemoguardrails.server.experimental.providers.openai.integration import create_openai_chat_router
 
 BLOCKED_ERROR = {
@@ -92,3 +93,10 @@ def stream_events(body):
         payload = b"\n".join(data)
         events.append("[DONE]" if payload == b"[DONE]" else json.loads(payload))
     return events
+
+
+async def raw_stream_events(body):
+    async def chunks():
+        yield body
+
+    return [event async for event in iter_sse_events(chunks(), max_event_bytes=1024 * 1024)]

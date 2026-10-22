@@ -42,8 +42,8 @@ BASE_URL = "https://api.openai.com/v1"
 MODEL = "gpt-5-nano-2025-08-07"
 INPUT = "Reply with exactly: Hello, recorded Responses!"
 ENDPOINT = RESPONSES_ENDPOINT
-BUFFERED_RECORDING = "test_native_responses_preserve_policy_and_wire[buffered].yaml"
-STREAMING_RECORDING = "test_native_responses_preserve_policy_and_wire[streaming].yaml"
+BUFFERED_RECORDING = "test_success_preserves_policy_and_wire[buffered].yaml"
+STREAMING_RECORDING = "test_success_preserves_policy_and_wire[streaming].yaml"
 
 
 def responses_request(stream, *, model=MODEL):
@@ -91,9 +91,7 @@ def assert_consumed_once(cassette):
 
 
 @pytest.mark.parametrize("stream", [False, True], ids=["buffered", "streaming"])
-async def test_native_responses_preserve_policy_and_wire(
-    openai_api_key, record_mode, recorded_cassette_path, vcr, stream
-):
+async def test_success_preserves_policy_and_wire(openai_api_key, record_mode, recorded_cassette_path, vcr, stream):
     request = responses_request(stream)
     upstream = await capture(openai_api_key, request)
     assert upstream.status_code == 200
@@ -148,7 +146,7 @@ async def test_native_responses_preserve_policy_and_wire(
 
 
 @pytest.mark.parametrize("stream", [False, True], ids=["buffered", "streaming"])
-async def test_native_provider_error_is_preserved(openai_api_key, record_mode, recorded_cassette_path, vcr, stream):
+async def test_invalid_model_preserves_provider_error(openai_api_key, record_mode, recorded_cassette_path, vcr, stream):
     request = responses_request(stream, model="recorded-invalid-responses-model")
     upstream = await capture(openai_api_key, request)
     assert upstream.status_code == 404
@@ -172,7 +170,7 @@ async def test_native_provider_error_is_preserved(openai_api_key, record_mode, r
 
 
 @pytest.mark.vcr(BUFFERED_RECORDING, record_mode="none")
-async def test_recorded_buffered_output_is_withheld_on_block(openai_api_key, vcr):
+async def test_buffered_output_is_withheld_on_block(openai_api_key, vcr):
     upstream = await capture(openai_api_key, responses_request(False))
     assert_consumed_once(vcr)
     text = assistant_text(upstream.json())
@@ -192,9 +190,7 @@ async def test_recorded_buffered_output_is_withheld_on_block(openai_api_key, vcr
 @pytest.mark.vcr(STREAMING_RECORDING, record_mode="none")
 @pytest.mark.parametrize("allowed_windows", [0, 1], ids=["first-window", "later-window"])
 @pytest.mark.parametrize("chunk_size,context_size", [(1, 0), (2, 1)], ids=["single-delta", "overlapping-context"])
-async def test_recorded_stream_releases_only_approved_prefix(
-    openai_api_key, vcr, allowed_windows, chunk_size, context_size
-):
+async def test_stream_releases_only_approved_prefix(openai_api_key, vcr, allowed_windows, chunk_size, context_size):
     upstream = await capture(openai_api_key, responses_request(True))
     assert_consumed_once(vcr)
     events = await stream_events(upstream.content)

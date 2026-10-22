@@ -134,7 +134,7 @@ async def validate_inventory(upstream, request):
 
 
 @pytest.mark.parametrize("stream", [False, True], ids=["buffered", "streaming"])
-async def test_gateway_responses_preserve_policy_and_wire(
+async def test_success_preserves_policy_and_wire(
     nvidia_inference_key, record_mode, recorded_cassette_path, vcr, stream
 ):
     request = responses_request(stream)
@@ -171,8 +171,8 @@ async def test_gateway_responses_preserve_policy_and_wire(
             assert checker.calls == []
 
 
-@pytest.mark.vcr("test_gateway_responses_preserve_policy_and_wire[buffered].yaml", record_mode="none")
-async def test_gateway_recorded_buffered_block_withholds_output(nvidia_inference_key, vcr):
+@pytest.mark.vcr("test_success_preserves_policy_and_wire[buffered].yaml", record_mode="none")
+async def test_buffered_output_is_withheld_on_block(nvidia_inference_key, vcr):
     checker = StaticChecker(ContentInspectionPolicy(True, True), output_decisions=[ContentBlocked("blocked by test")])
     dispatches = []
     async with proxy(nvidia_inference_key, checker, dispatches) as client:
@@ -186,9 +186,9 @@ async def test_gateway_recorded_buffered_block_withholds_output(nvidia_inference
     assert checker.text_calls[1][1] not in response.text
 
 
-@pytest.mark.vcr("test_gateway_responses_preserve_policy_and_wire[streaming].yaml", record_mode="none")
+@pytest.mark.vcr("test_success_preserves_policy_and_wire[streaming].yaml", record_mode="none")
 @pytest.mark.parametrize("allowed_windows", [0, 1], ids=["first-window", "later-window"])
-async def test_gateway_recorded_stream_releases_only_approved_prefix(nvidia_inference_key, vcr, allowed_windows):
+async def test_stream_releases_only_approved_prefix(nvidia_inference_key, vcr, allowed_windows):
     upstream = await capture(nvidia_inference_key, responses_request(True))
     recorded_events = await events(upstream.content)
     deltas = [

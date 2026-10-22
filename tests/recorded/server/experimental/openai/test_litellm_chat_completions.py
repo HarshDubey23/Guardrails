@@ -13,13 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 from copy import deepcopy
 from dataclasses import replace
 from functools import partial
-from pathlib import Path
 
 import pytest
-import yaml
 
 from nemoguardrails.server.experimental._content_checker import (
     ContentAllowed,
@@ -32,7 +31,7 @@ from nemoguardrails.server.experimental.providers.openai.dialects.litellm.chat_c
 )
 from tests.recorded.assertions import assert_request_payload
 from tests.recorded.cassette import cassette_request_jsons
-from tests.recorded.server.experimental.openai.chat_support import BLOCKED_ERROR, stream_events
+from tests.recorded.server.experimental.openai.chat_support import BLOCKED_ERROR, raw_stream_events, stream_events
 from tests.recorded.server.experimental.openai.chat_support import recorded_proxy as chat_proxy
 from tests.recorded.server.experimental.openai.chat_support import single_upstream_exchange as single_upstream_exchange
 from tests.recorded.snapshots import snapshot
@@ -48,8 +47,8 @@ NVIDIA_INFERENCE_BASE_URL = "https://inference-api.nvidia.com/v1"
 OPENAI_MODEL = "openai/openai/gpt-5-nano"
 INVALID_OPENAI_MODEL = "openai/openai/recorded-invalid-model"
 USER_MESSAGE = "Hello! Can you help me with a short greeting?"
-BUFFERED_RECORDING = "test_buffered_chat_preserves_guarded_constrained_and_opaque_contract_fields.yaml"
-STREAMING_RECORDING = "test_streaming_chat_preserves_declared_events_and_opaque_metadata.yaml"
+BUFFERED_RECORDING = "test_success_preserves_policy_and_wire[buffered].yaml"
+STREAMING_RECORDING = "test_success_preserves_policy_and_wire[streaming].yaml"
 
 recorded_proxy = partial(chat_proxy, endpoint=LITELLM_CHAT_COMPLETIONS_ENDPOINT, base_url=NVIDIA_INFERENCE_BASE_URL)
 
@@ -90,10 +89,10 @@ def normalize_provider_metadata(value):
     return value
 
 
-def recorded_provider_response(cassette_path):
-    interactions = yaml.safe_load(cassette_path.read_text(encoding="utf-8"))["interactions"]
-    assert len(interactions) == 1
-    return interactions[0]["response"]
+def recorded_provider_bytes(cassette):
+    assert len(cassette.responses) == 1
+    body = cassette.responses[0]["body"]["string"]
+    return body.encode() if isinstance(body, str) else body
 
 
 async def assert_allowed_relay_is_transparent(
@@ -170,31 +169,7 @@ def assert_recorded_request(record_mode, cassette_path, expected):
     assert recorded == expected
 
 
-async def test_buffered_chat_preserves_guarded_constrained_and_opaque_contract_fields(
-    nvidia_inference_key, record_mode, recorded_cassette_path, checker, vcr
-):
-    request = chat_request()
-    dispatched = []
-    async with recorded_proxy(nvidia_inference_key, checker, dispatched) as client:
-        response = await client.post("/v1/chat/completions", json=request)
-
-    assert response.status_code == 200, response.text
-    payload = response.json()
-    assert len(payload["choices"]) == 1
-    assert payload["choices"][0]["message"]["role"] == "assistant"
-    assert payload["choices"][0]["message"]["content"]
-    assert checker.text_calls == [
-        ("input", USER_MESSAGE),
-        ("output", payload["choices"][0]["message"]["content"]),
-    ]
-    assert_recorded_request(record_mode, recorded_cassette_path, request)
-    if record_mode == "none":
-        await assert_allowed_relay_is_transparent(
-            nvidia_inference_key, request, response, dispatched, vcr, stream=False
-        )
-        provider_response = recorded_provider_response(recorded_cassette_path)
-        assert response.status_code == provider_response["status"]["code"]
-        assert normalize_provider_metadata(payload) == provider_response["body"]["parsed_body"]
+def assert_buffered_success_snapshot(payload):
     assert normalize_provider_metadata(payload) == snapshot(
         {
             "id": "[RECORDED_RESPONSE_ID]",
@@ -254,29 +229,7 @@ If you share who it’s for and the tone you want (casual, professional, etc.), 
     )
 
 
-async def test_streaming_chat_preserves_declared_events_and_opaque_metadata(
-    nvidia_inference_key, record_mode, recorded_cassette_path, checker, vcr
-):
-    request = chat_request(stream=True)
-    dispatched = []
-    async with recorded_proxy(nvidia_inference_key, checker, dispatched) as client:
-        response = await client.post("/v1/chat/completions", json=request)
-
-    assert response.status_code == 200
-    assert response.headers["content-type"].partition(";")[0] == "text/event-stream"
-    events = stream_events(response.content)
-    assert events[-1] == "[DONE]"
-    summary = summarize_stream(events)
-    content = summary["content"]
-    assert content
-    assert checker.text_calls[0] == ("input", USER_MESSAGE)
-    assert "".join(value for kind, value in checker.text_calls if kind == "output") == content
-    assert_recorded_request(record_mode, recorded_cassette_path, request)
-    if record_mode == "none":
-        await assert_allowed_relay_is_transparent(nvidia_inference_key, request, response, dispatched, vcr, stream=True)
-        provider_response = recorded_provider_response(recorded_cassette_path)
-        assert response.status_code == provider_response["status"]["code"]
-        assert normalize_provider_metadata(events) == provider_response["body"]["parsed_body"]
+def assert_streaming_success_snapshot(summary):
     assert summary == snapshot(
         {
             "content": """\
@@ -310,7 +263,49 @@ What context are you using it for (text, email, in person) and what tone should 
 
 
 @pytest.mark.parametrize("stream", [False, True], ids=["buffered", "streaming"])
-async def test_real_provider_error_is_preserved_before_output_inspection(
+async def test_success_preserves_policy_and_wire(
+    nvidia_inference_key, record_mode, recorded_cassette_path, checker, vcr, stream
+):
+    request = chat_request(stream=stream)
+    dispatched = []
+    async with recorded_proxy(nvidia_inference_key, checker, dispatched) as client:
+        response = await client.post("/v1/chat/completions", json=request)
+
+    assert response.status_code == 200
+    if stream:
+        assert response.headers["content-type"].partition(";")[0] == "text/event-stream"
+        events = stream_events(response.content)
+        assert events[-1] == "[DONE]"
+        parts = [
+            choice["delta"]["content"]
+            for event in events
+            if isinstance(event, dict)
+            for choice in event.get("choices", [])
+            if choice.get("delta", {}).get("content")
+        ]
+        assert parts
+        assert checker.text_calls == [("input", USER_MESSAGE)] + [("output", part) for part in parts]
+        assert_streaming_success_snapshot(summarize_stream(events))
+    else:
+        payload = response.json()
+        assert len(payload["choices"]) == 1
+        assert payload["choices"][0]["message"]["role"] == "assistant"
+        content = payload["choices"][0]["message"]["content"]
+        assert content
+        assert checker.text_calls == [("input", USER_MESSAGE), ("output", content)]
+        assert_buffered_success_snapshot(payload)
+    assert_recorded_request(record_mode, recorded_cassette_path, request)
+    if record_mode == "none":
+        await assert_allowed_relay_is_transparent(
+            nvidia_inference_key, request, response, dispatched, vcr, stream=stream
+        )
+        provider_response = vcr.responses[0]
+        assert response.status_code == provider_response["status"]["code"]
+        assert response.content == recorded_provider_bytes(vcr)
+
+
+@pytest.mark.parametrize("stream", [False, True], ids=["buffered", "streaming"])
+async def test_invalid_model_preserves_provider_error(
     nvidia_inference_key, record_mode, recorded_cassette_path, stream, checker, vcr
 ):
     request = chat_request(model=INVALID_OPENAI_MODEL, stream=stream)
@@ -325,9 +320,9 @@ async def test_real_provider_error_is_preserved_before_output_inspection(
         await assert_allowed_relay_is_transparent(
             nvidia_inference_key, request, response, dispatched, vcr, stream=stream
         )
-        provider_response = recorded_provider_response(recorded_cassette_path)
+        provider_response = vcr.responses[0]
         assert response.status_code == provider_response["status"]["code"]
-        assert normalize_provider_metadata(response.json()) == provider_response["body"]["parsed_body"]
+        assert response.content == recorded_provider_bytes(vcr)
     assert {
         "status_code": response.status_code,
         "content_type": response.headers["content-type"].partition(";")[0],
@@ -349,7 +344,7 @@ async def test_real_provider_error_is_preserved_before_output_inspection(
 
 
 @pytest.mark.parametrize("stream", [False, True], ids=["buffered", "streaming"])
-async def test_nvidia_chat_source_profile_preserves_allowed_relay(
+async def test_alternate_prompt_preserves_policy_and_wire(
     nvidia_inference_key, record_mode, recorded_cassette_path, stream, checker, vcr
 ):
     request = chat_request(stream=stream)
@@ -380,9 +375,9 @@ async def test_nvidia_chat_source_profile_preserves_allowed_relay(
 
 
 @pytest.mark.vcr(BUFFERED_RECORDING, record_mode="none")
-async def test_recorded_buffered_output_is_withheld_on_block(nvidia_inference_key, vcr_cassette_dir, checker):
+async def test_buffered_output_is_withheld_on_block(nvidia_inference_key, vcr, checker):
     checker.output_decisions = [ContentBlocked("blocked by test")]
-    provider_body = recorded_provider_response(Path(vcr_cassette_dir) / BUFFERED_RECORDING)["body"]["parsed_body"]
+    provider_body = json.loads(recorded_provider_bytes(vcr))
     content = provider_body["choices"][0]["message"]["content"]
     dispatched = []
     async with recorded_proxy(nvidia_inference_key, checker, dispatched) as client:
@@ -398,16 +393,19 @@ async def test_recorded_buffered_output_is_withheld_on_block(nvidia_inference_ke
 @pytest.mark.vcr(STREAMING_RECORDING, record_mode="none")
 @pytest.mark.parametrize("allowed_windows", [0, 1], ids=["first-window", "later-window"])
 @pytest.mark.parametrize("chunk_size,context_size", [(1, 0), (2, 1)], ids=["single-delta", "overlapping-context"])
-async def test_recorded_stream_releases_only_approved_prefix(
-    nvidia_inference_key, vcr_cassette_dir, checker, allowed_windows, chunk_size, context_size
+async def test_stream_releases_only_approved_prefix(
+    nvidia_inference_key, vcr, checker, allowed_windows, chunk_size, context_size
 ):
     checker.policy = ContentInspectionPolicy(True, True, StreamBufferingPolicy(chunk_size, context_size))
     checker.output_decisions = [ContentAllowed()] * allowed_windows + [ContentBlocked("blocked by test")]
-    provider_events = recorded_provider_response(Path(vcr_cassette_dir) / STREAMING_RECORDING)["body"]["parsed_body"]
+    provider_wire = recorded_provider_bytes(vcr)
+    provider_events = await raw_stream_events(provider_wire)
     text_events = [
-        (index, event["choices"][0]["delta"]["content"])
+        (index, choice["delta"]["content"])
         for index, event in enumerate(provider_events)
-        if isinstance(event, dict) and event.get("choices") and event["choices"][0].get("delta", {}).get("content")
+        if event.data not in (None, b"[DONE]")
+        for choice in json.loads(event.data).get("choices", [])
+        if choice.get("delta", {}).get("content")
     ]
     assert len(text_events) > (allowed_windows + 1) * chunk_size
     approved_deltas = allowed_windows * chunk_size
@@ -429,7 +427,7 @@ async def test_recorded_stream_releases_only_approved_prefix(
     assert all(check.input_message.content == USER_MESSAGE for kind, check in checker.calls if kind == "output")
     assert response.status_code == 200
     assert response.headers["content-type"].partition(";")[0] == "text/event-stream"
-    received = stream_events(response.content)
-    assert received[-1] == "[DONE]"
-    assert received[-2] == BLOCKED_ERROR
-    assert received[:-2] == provider_events[:released_end]
+    received = await raw_stream_events(response.content)
+    assert received[-1].data == b"[DONE]"
+    assert json.loads(received[-2].data) == BLOCKED_ERROR
+    assert [event.raw for event in received[:-2]] == [event.raw for event in provider_events[:released_end]]

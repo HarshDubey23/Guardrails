@@ -74,10 +74,10 @@ ARRAY_LOCATIONS = [
 
 CASSETTES = Path(__file__).parents[6] / "recorded/server/experimental/openai/cassettes/test_litellm_chat_completions"
 SUCCESS_RECORDINGS = (
-    "test_buffered_chat_preserves_guarded_constrained_and_opaque_contract_fields",
-    "test_nvidia_chat_source_profile_preserves_allowed_relay[buffered]",
-    "test_streaming_chat_preserves_declared_events_and_opaque_metadata",
-    "test_nvidia_chat_source_profile_preserves_allowed_relay[streaming]",
+    "test_success_preserves_policy_and_wire[buffered]",
+    "test_alternate_prompt_preserves_policy_and_wire[buffered]",
+    "test_success_preserves_policy_and_wire[streaming]",
+    "test_alternate_prompt_preserves_policy_and_wire[streaming]",
 )
 
 
