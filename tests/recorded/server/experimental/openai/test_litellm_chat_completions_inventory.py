@@ -38,7 +38,7 @@ from nemoguardrails.server.experimental.providers.openai.dialects.litellm.chat_c
 
 pytestmark = [pytest.mark.recorded]
 
-CASSETTES = Path(__file__).parent / "cassettes/test_chat_completions"
+CASSETTES = Path(__file__).parent / "cassettes/test_litellm_chat_completions"
 SUCCESS_RECORDINGS = (
     "test_buffered_chat_preserves_guarded_constrained_and_opaque_contract_fields",
     "test_nvidia_chat_source_profile_preserves_allowed_relay[buffered]",

@@ -146,7 +146,8 @@ def sse_bytes(*events):
 
 
 def recorded_exchange(stream, *, gateway=False):
-    directory = Path(__file__).parents[5] / "recorded/server/experimental/openai/cassettes/test_chat_completions"
+    module = "test_litellm_chat_completions" if gateway else "test_chat_completions"
+    directory = Path(__file__).parents[5] / "recorded/server/experimental/openai/cassettes" / module
     if gateway:
         name = (
             "test_streaming_chat_preserves_declared_events_and_opaque_metadata"

@@ -8,10 +8,18 @@ is not evidence that a real Rails configuration produces those verdicts.
 
 ## Current Chat coverage
 
-The [Chat suite](openai/test_chat_completions.py) selects the native OpenAI
-endpoint for direct OpenAI recordings and the LiteLLM dialect for the archived
-NVIDIA inference exchanges. All six gateway source cassettes remain unchanged. The [inventory](openai/test_litellm_inventory.py) pins which
+The [native Chat suite](openai/test_chat_completions.py) selects the native OpenAI
+endpoint for direct OpenAI recordings. The
+[LiteLLM Chat suite](openai/test_litellm_chat_completions.py) selects the LiteLLM
+dialect for the archived NVIDIA inference exchanges. Its six cassettes live in
+`openai/cassettes/test_litellm_chat_completions/`; their contents are unchanged.
+The [inventory](openai/test_litellm_chat_completions_inventory.py) pins which
 extension shapes actually occurred and checks runtime/export acceptance.
+
+Recorded modules use `test_{operation}.py` for native OpenAI and
+`test_{dialect}_{operation}.py` for explicitly selected dialects. Each module's
+cassettes live under `openai/cassettes/{module_stem}/`. Responses follows the
+same convention with `test_responses.py` and `test_litellm_responses.py`.
 
 | Scenario | Evidence and assertion |
 | --- | --- |

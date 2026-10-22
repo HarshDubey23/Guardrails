@@ -103,7 +103,7 @@ OPENAI_API_KEY=... make record-cassettes \
   RECORDED_REQUIRED_KEYS=OPENAI_API_KEY
 ```
 
-The OpenAI Chat proxy recordings use the OpenAI protocol through NVIDIA's
+The LiteLLM Chat proxy recordings use the OpenAI protocol through NVIDIA's
 inference endpoint and explicitly bind the
 [LiteLLM dialect](../../nemoguardrails/server/experimental/providers/openai/dialects/litellm/README.md).
 The default OpenAI endpoint is not silently widened to accept this gateway.
@@ -111,7 +111,7 @@ Refresh them with the dedicated credential and no OpenAI key:
 
 ```bash
 NVIDIA_INFERENCE_KEY=... make record-cassettes \
-  RECORDED_TESTS=tests/recorded/server/experimental/openai/test_chat_completions.py \
+  RECORDED_TESTS=tests/recorded/server/experimental/openai/test_litellm_chat_completions.py \
   RECORDED_REQUIRED_KEYS=NVIDIA_INFERENCE_KEY
 ```
 

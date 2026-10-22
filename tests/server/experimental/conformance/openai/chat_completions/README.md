@@ -12,7 +12,8 @@ backend, every field value, real Rails configuration, or YAML application wiring
 - [Reviewed LiteLLM source inventory](../../../../../../nemoguardrails/server/experimental/providers/openai/dialects/litellm/README.md):
   source-backed extension decisions and the distinction between buffered and
   streaming bags. An open upstream dictionary does not authorize opaque content.
-- [Recorded Chat suite](../../../../../recorded/server/experimental/openai/test_chat_completions.py):
+- [Native Chat suite](../../../../../recorded/server/experimental/openai/test_chat_completions.py)
+  and [LiteLLM Chat suite](../../../../../recorded/server/experimental/openai/test_litellm_chat_completions.py):
   four native success/error cassettes and six archived gateway cassettes, with
   [capture provenance](../../../../../recorded/server/experimental/README.md).
 
@@ -71,7 +72,7 @@ framing. Unknown content fails closed under the default inspected policy.
 
 ```bash
 make test WORKERS=0 \
-  TEST="tests/server/experimental/conformance/openai/chat_completions tests/recorded/server/experimental/openai/test_chat_completions.py tests/recorded/server/experimental/openai/test_litellm_inventory.py" \
+  TEST="tests/server/experimental/conformance/openai/chat_completions tests/recorded/server/experimental/openai/test_chat_completions.py tests/recorded/server/experimental/openai/test_litellm_chat_completions.py tests/recorded/server/experimental/openai/test_litellm_chat_completions_inventory.py" \
   ARGS="--block-network --record-mode=none"
 ```
 
