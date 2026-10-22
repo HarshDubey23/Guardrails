@@ -53,6 +53,9 @@ as opaque metadata. Synthetic source-valid cases still validate independently.
 - `test_http.py` exercises independently source-valid synthetic cases.
 - `dialects/test_litellm.py` tests closed extension bags and empty-only content
   fields, including usage-only streaming events.
+- `dialects/test_litellm_inventory.py` audits the four successful gateway
+  recordings for observed extension bags and bound-policy/export acceptance.
+  It reads the original cassettes under `tests/recorded/` without provider calls.
 - `test_recorded_probes.py` keeps unmodified recordings as positive controls,
   then mutates copies in memory to try additional reasoning/refusal text,
   case aliases, logprobs, extra choices, and request controls. It checks both
@@ -72,7 +75,7 @@ framing. Unknown content fails closed under the default inspected policy.
 
 ```bash
 make test WORKERS=0 \
-  TEST="tests/server/experimental/conformance/openai/chat_completions tests/recorded/server/experimental/openai/test_chat_completions.py tests/recorded/server/experimental/openai/test_litellm_chat_completions.py tests/recorded/server/experimental/openai/test_litellm_chat_completions_inventory.py" \
+  TEST="tests/server/experimental/conformance/openai/chat_completions tests/recorded/server/experimental/openai/test_chat_completions.py tests/recorded/server/experimental/openai/test_litellm_chat_completions.py" \
   ARGS="--block-network --record-mode=none"
 ```
 

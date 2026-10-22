@@ -115,11 +115,15 @@ NVIDIA_INFERENCE_KEY=... make record-cassettes \
   RECORDED_REQUIRED_KEYS=NVIDIA_INFERENCE_KEY
 ```
 
-Replay the Chat pipeline and the archived-field inventory together:
+Replay the recorded proxy pipelines:
 
 ```bash
 make replay-cassettes RECORDED_TESTS=tests/recorded/server/experimental/openai
 ```
+
+The [archived-field inventory](../server/experimental/conformance/openai/chat_completions/dialects/test_litellm_inventory.py)
+runs with the [conformance suite](../server/experimental/conformance/README.md)
+and reads the same cassettes without recording or replaying provider calls.
 
 The [proxy integration guide](server/experimental/README.md) describes the
 allow/block scenarios, reusable checker helper, single-use replay assertions,
