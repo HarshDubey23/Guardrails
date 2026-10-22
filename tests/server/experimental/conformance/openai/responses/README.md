@@ -80,24 +80,9 @@ decisions from runtime output.
 
 ## Record and replay
 
-The credential must already be available to the test process. Do not place it
-in commands, test data, logs, or review reports.
-
-```bash
-make record-cassettes \
-  RECORDED_TESTS=tests/recorded/server/experimental/openai/test_responses.py \
-  RECORDED_REQUIRED_KEYS=OPENAI_API_KEY
-make replay-cassettes \
-  RECORDED_TESTS=tests/recorded/server/experimental/openai/test_responses.py
-```
-
-Capture completes before projection validation so new fields are retained for
-review. The mandatory offline replay then validates the contract and routing.
-Each pass consumes exactly one interaction; explicit rewinds separate direct,
-inspected, and uninspected comparisons. Unlimited playback is not enabled.
-The shared sanitizer filters credentials and selected metadata; it preserves
-nested IDs and content. Equality refers to sanitized replay bytes, not original
-network chunking, whitespace, or live delivery timing.
+See the [proxy recording guide](../../../../../recorded/server/experimental/README.md)
+for capture, replay, sanitization, and provenance. Select `test_responses.py` with
+`OPENAI_API_KEY` or `test_litellm_responses.py` with `NVIDIA_INFERENCE_KEY`.
 
 ## Independent reviewer probes
 
@@ -118,26 +103,7 @@ writes or records the altered payloads. Unmodified positive controls exercise
 the same injection path. These are synthetic rejection probes, not evidence
 that OpenAI actually emitted those unsupported bodies.
 
-A reviewer or review agent should inspect evidence before reading the current
-classification table. Use these questions as separate review passes:
-
-1. **Completeness:** enumerate source properties and example/recorded keys at
-   each object boundary. Report omissions with exact paths and provenance.
-   Distinguish native metadata from gateway annotations; response metadata is shared,
-   while root SSE `model` requires the selected dialect. Check lifecycle
-   responses as well as buffered responses.
-2. **Text admission:** attempt additional input, history, tool arguments,
-   reasoning summaries, refusals, citations, and duplicate output text. For
-   each accepted case, identify which checker sees the text. An accepted text
-   channel without inspection needs an explicit scope decision or a fix.
-3. **Streaming:** block the first and a later delta; verify only the approved
-   prefix escapes. Change a final snapshot while preserving deltas and verify
-   rejection. Metadata events must not introduce a second content channel.
-4. **Evidence quality:** verify native origin, request model and controls,
-   sanitization, exact interaction counts, and offline-only replay. Synthetic
-   verdicts and payload mutations must be labeled separately from recordings.
-
-Return a path, source/cassette reference, minimal reproduction, expected versus
-actual behavior, and proposed classification for each finding. A passing test
-suite or export comparison alone is not a semantic review. These instructions
-prepare independent review; they do not claim that such a review has run.
+Follow the [shared reviewer probes](../../README.md#reviewer-probes). For
+Responses, check lifecycle snapshots as well as buffered bodies, changed final
+text after approved deltas, encrypted reasoning state, and the distinction
+between shared response metadata and the dialect's root SSE `model` annotation.

@@ -72,7 +72,7 @@ The matching public tag resolves to
   constructs a Responses object from native OpenAI JSON, with a construction
   fallback on validation failure. SHA-256: `7c6f3bea7678b76b6e99bc5b4c499eef9aead8947a6a81e534dc5e42c84bfc70`.
 
-The original two genuine success cassettes live in
+Success cassettes live in
 `tests/recorded/server/experimental/openai/cassettes/test_litellm_responses/`.
 They capture `openai/openai/gpt-5-nano` through NVIDIA's inference gateway, with a
 harmless greeting, `store: false`, and a 256-token output limit. Buffered evidence
@@ -82,14 +82,9 @@ snapshots, content-part snapshots and text deltas/done. No new event type or Cha
 extension bag was observed. They are evidence for this route, not raw vLLM or
 every LiteLLM backend.
 
-Three follow-up cassettes captured on 2026-10-22 add invalid-model HTTP errors
-requested in both modes and a longer successful stream. Both error responses are
-HTTP 403 `key_model_access_denied` for `openai/openai/recorded-invalid-model`;
-they are gateway routing denials, not recorded SSE error events. The longer
-success requests and returns `openai/openai/gpt-5-nano` and contains 19 text
-deltas, supporting first/later blocking with overlapping context. The original
-success cassettes remain unchanged. These captures do not establish the current
-deployment version. See the [capture provenance](../../../../../../../tests/recorded/server/experimental/README.md#litellm-responses-follow-up-captures).
+The [capture provenance](../../../../../../../tests/recorded/server/experimental/README.md#capture-provenance)
+also documents invalid-model HTTP errors and the longer stream used for
+overlapping-window blocking.
 
 The [LiteLLM Responses documentation](https://docs.litellm.ai/docs/response_api)
 also describes Chat-to-Responses bridging. These cassettes do not establish
@@ -97,15 +92,6 @@ compatibility with bridged routes. Nested LiteLLM SSE errors, additional content
 channels, and other backend-specific fields remain unsupported and fail closed.
 Flat diagnostic errors and other inherited events have synthetic unit coverage;
 they are not claimed as recorded observations.
-
-Recordings use the same shared sanitizer as the Chat recordings: credentials are
-removed and selected response metadata is normalized. There is no Responses-only
-content redaction. Assistant text, encrypted content, nested item identifiers,
-event order, sequence numbers and field presence are retained, subject to the
-shared credential filters. Sanitization is not a policy repair: unsupported
-fields must not be deleted to make replay pass.
-Exact passthrough comparisons are against the sanitized replay bytes, not a claim
-that the cassette preserves original HTTP chunk boundaries or all original bytes.
 
 ## Validation and export
 
@@ -122,14 +108,9 @@ uv run --locked python -m nemoguardrails.server.experimental.provider.contract_e
   --output nemoguardrails/server/experimental/contracts/openai/_generated/litellm-responses.guard.yaml
 ```
 
-Capture consumes the entire upstream response before policy assertions. Mandatory
-offline replay then checks the actual endpoint, export, text extraction, terminal
-behavior and passthrough bytes. A successful capture alone is not compatibility
-validation. Each replay pass consumes exactly one interaction, with explicit rewinds between
-direct, inspected, and uninspected comparisons. Successful cassettes also cover
-buffered blocking and first/later streaming-window blocking, including overlapping
-context, with synthetic
-checker verdicts, forced to replay even during refresh. Dialect rejection cases
-use synthetic unit fixtures; cancellation and malformed-stream tests remain
-with the existing Responses stack.
+Capture alone does not establish compatibility; mandatory offline replay checks
+the selected endpoint and its allow/block behavior. See the
+[recording guide](../../../../../../../tests/recorded/server/experimental/README.md)
+for replay guarantees and evidence limits. Synthetic unit tests cover unsupported
+content, errors, cancellation, and malformed streams.
 The exported YAML describes the effective declarations and is not a runtime input.

@@ -14,7 +14,7 @@ backend, every field value, real Rails configuration, or YAML application wiring
   streaming bags. An open upstream dictionary does not authorize opaque content.
 - [Native Chat suite](../../../../../recorded/server/experimental/openai/test_chat_completions.py)
   and [LiteLLM Chat suite](../../../../../recorded/server/experimental/openai/test_litellm_chat_completions.py):
-  four native success/error cassettes and six archived gateway cassettes, with
+  native and gateway success/error captures, with
   [capture provenance](../../../../../recorded/server/experimental/README.md).
 
 Native captures use the base endpoint. The archived buffered gateway response
@@ -79,20 +79,6 @@ make test WORKERS=0 \
   ARGS="--block-network --record-mode=none"
 ```
 
-Independent reviewers or review agents should perform these passes:
-
-1. Enumerate source and observed keys before reading our classifications.
-   Check every nested boundary, source discrepancy, and native/dialect difference.
-2. Trace each possible text channel to its checker or explicit rejection rule.
-   Inspect reasoning, refusals, tools, citations, logprobs, participant names,
-   extension bags, and fields that affect routing or guardrail selection.
-3. Probe usage-only chunks, additional choices, case aliases, and blocked
-   streams. Verify exact approved prefixes and terminal/error framing. Check
-   that disabling response inspection does not bypass request admission.
-4. Check capture origin, selected model, sanitizer behavior, one-interaction
-   accounting, and separation of real evidence from synthetic mutations.
-
-Report the field path, evidence reference, minimal reproduction, expected and
-actual behavior, and proposed decision for each finding. Passing schema/export
-checks alone do not establish semantic correctness. These instructions prepare
-independent review; they do not claim a separate reviewer has run.
+Follow the [shared reviewer probes](../../README.md#reviewer-probes), including
+Chat usage-only chunks, buffered/streaming index differences, extension bags,
+and the pinned-source discrepancies above.

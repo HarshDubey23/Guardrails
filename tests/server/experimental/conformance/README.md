@@ -7,53 +7,15 @@ dialect. They do not establish compatibility with every OpenAI-compatible deploy
 
 ## Coverage
 
-- `openai/chat_completions/test_schema.py` audits every bound policy model
-  against its inspected source object, including reviewed opaque fields and
-  explicit local extensions. It also checks explicit content classifications for
-  both endpoints and the complete LiteLLM model graph. Export consistency is secondary.
-- `openai/chat_completions/test_http.py` exercises the actual router and HTTP
-  dispatcher with synthetic source-valid examples. It checks metadata and byte
-  preservation, exact inspected text, unsupported content, error envelopes, and
-  buffered/streaming behavior with inspection enabled or disabled.
-- `openai/chat_completions/dialects/test_litellm.py` audits observed fields in the
-  four successful gateway recordings and checks bound-policy/export acceptance.
-  Synthetic HTTP cases check dialect selection, extension preservation, rejection
-  of unreviewed content, and unchanged text targets. These cases follow the
-  [reviewed LiteLLM source inventory](../../../../nemoguardrails/server/experimental/providers/openai/dialects/litellm/README.md).
-  Recorded evidence stays under `tests/recorded/`; these checks make no provider calls.
-- `openai/chat_completions/test_recorded_probes.py` adds native/gateway positive
-  controls and synthetic mutations of recorded bodies. It makes pinned-source
-  discrepancies explicit and checks additional text, usage-only events, request
-  admission, and dialect selection. See the [Chat review guide](openai/chat_completions/README.md).
+- [Chat Completions](openai/chat_completions/README.md): source and classification
+  audits, HTTP behavior, observed dialect extensions, and mutations of recordings.
+- [Responses](openai/responses/README.md): source/example inventories, native and
+  dialect boundaries, request admission, text channels, and snapshot consistency.
 
-- `openai/responses/test_schema.py` audits bound request, response, and event
-  models against the pinned source inventory and official example, with explicit
-  native additions. Export consistency remains a secondary check.
-- `openai/responses/test_http.py` injects labeled synthetic mutations of native
-  recordings through the actual HTTP path. It checks request admission, additional
-  text channels, and snapshot consistency with inspection enabled and disabled.
-- `openai/responses/dialects/test_litellm.py` checks the selected dialect against
-  gateway evidence, shared native metadata, root event annotations, and unsupported
-  containers/errors. The [Responses guide](openai/responses/README.md) includes
-  provenance, reproduction commands, and independent reviewer probes.
-
-`openai/chat_completions/http_support.py` shares the Chat router/transport harness and error
-assertions; `openai/chat_completions/support.py` holds Chat payload and source helpers. Checker
-doubles remain shared across server tests in `../checkers.py`. Responses probes
-reuse `../responses_proxy.py`, also used by the recorded suites; their evidence
-loaders and mutation helpers live in `openai/responses/support.py`.
-
-Disabling inspection does not remove guarded-request validation. Unknown output
-content fails closed when inspected and is relayed unchanged when uninspected.
-Existing recorded and kernel tests cover checker blocking, stream sequencing,
-and cleanup; this suite adds independent source evidence rather than duplicating
-those tests.
-
-These are offline tests with deterministic checker doubles and mocked network
-I/O. They do not validate real Rails configurations, socket delivery, application
-lifecycle, or current live-provider behavior. Guard models are partial policy
-projections, not complete provider validators; field coverage is not exhaustive
-value or combination coverage.
+Tests use deterministic checker doubles and mocked network I/O. Guard models are
+partial policy projections, not complete provider validators. Disabling output
+inspection preserves guarded-request admission. Real Rails configuration, socket
+delivery, and live-provider behavior require separate coverage.
 
 ## Important limitations
 
@@ -76,6 +38,25 @@ For another operation or dialect, identify independent source evidence, audit
 the actual bound models, and supply explicit valid and unsupported examples with
 independent expected outcomes. Reuse checker helpers and existing kernel tests;
 keep event sequencing, terminal markers, and error envelopes protocol-specific.
+
+## Reviewer probes
+
+Reviewers and review agents should inspect evidence before our classifications:
+
+1. Enumerate source, example, and recorded keys at each nested boundary. Check
+   omissions, discrepancies, and native/dialect distinctions.
+2. Trace possible text channels to inspection or explicit rejection: instructions,
+   history, tools, reasoning, refusals, citations, logprobs, participant names,
+   and extension bags. Review routing and guardrail-selection controls.
+3. Probe unknown fields, case aliases, extra outputs, first/later blocking, and
+   final snapshots. Verify the exact approved prefix and protocol framing, plus
+   request admission with output inspection disabled.
+4. Verify capture origin, model/controls, sanitization, and interaction counts.
+   Distinguish genuine provider evidence from synthetic verdicts and mutations.
+
+Report field path, evidence reference, minimal reproduction, expected/actual
+behavior, and proposed classification. Schema/export agreement alone does not
+establish semantic correctness.
 
 ## Running tests
 

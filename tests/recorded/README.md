@@ -43,38 +43,27 @@ OPENAI_API_KEY=... make record-cassettes \
 
 ## Negative paths
 
-This suite owns **pipeline-level** failures (how `LLMRails` behaves when a model call
-fails) and **public-API input validation**. Client/wire-level conditions (status code to
-exception mapping, retries, SSE, malformed bodies) belong in `tests/llm/clients/`, which
-covers them with `httpx.MockTransport` + JSON fixtures; do not duplicate them here.
+Record genuine provider errors when testing how an integration handles failed
+calls. Invalid-model requests can provide refreshable error cases; the status
+and error shape depend on the provider. Keep input-only validation and synthetic
+transport failures in unit tests unless they need the recorded integration path.
+Use a [fake cassette](#fake-outputs) only when the required response cannot be
+reproduced or injected through a test double.
 
-Prefer mechanisms in this order:
-
-1. **Recordable real error** (refreshable cassette). A nonexistent model name yields a real,
-   deterministic 404, so error paths record and refresh like any happy path. Use a config
-   whose model is invalid (see `OPENAI_INVALID_MODEL_CONFIG`,
-   `CONTENT_SAFETY_INVALID_MODEL_CONFIG`).
-2. **Pure runtime** `pytest.raises` for input validation (no cassette, no transport).
-3. **Fake cassette** (`@pytest.mark.fake_cassette`) only as a last resort, for a synthetic
-   response that must flow through the full pipeline and cannot be reproduced by 1 or 2.
-
-Observed behavior these tests pin: a failing model call (main *or* a rail's own model)
-propagates as `LLMCallException` — a safety-model failure does not let content through
-silently. Name negative tests `test_<surface>_<failure>_<behavior>` with the suffixes
-`_raises` / `_fails_closed` / `_invalid_*` so they are greppable
-(`pytest -k "raises or invalid"`), and co-locate each with its happy-path sibling module.
+Co-locate error tests with their successful cases and name the failure and
+expected behavior explicitly.
 
 ## Replay
 
 ```bash
-uv run pytest tests/recorded --block-network -v --durations=10
+uv run --locked pytest tests/recorded --block-network -v --durations=10
 ```
 
 Focused rails replay:
 
 ```bash
-uv run pytest tests/recorded/rails/public_api --block-network -v
-uv run pytest tests/recorded/rails/library --block-network -v
+uv run --locked pytest tests/recorded/rails/public_api --block-network -v
+uv run --locked pytest tests/recorded/rails/library --block-network -v
 ```
 
 Replay mode installs dummy API keys from `tests/recorded/utils.py`. A cassette miss with `--block-network` is a test failure.
@@ -103,58 +92,8 @@ OPENAI_API_KEY=... make record-cassettes \
   RECORDED_REQUIRED_KEYS=OPENAI_API_KEY
 ```
 
-The LiteLLM Chat proxy recordings use the OpenAI protocol through NVIDIA's
-inference endpoint and explicitly bind the
-[LiteLLM dialect](../../nemoguardrails/server/experimental/providers/openai/dialects/litellm/README.md).
-The default OpenAI endpoint is not silently widened to accept this gateway.
-Refresh them with the dedicated credential and no OpenAI key:
-
-```bash
-NVIDIA_INFERENCE_KEY=... make record-cassettes \
-  RECORDED_TESTS=tests/recorded/server/experimental/openai/test_litellm_chat_completions.py \
-  RECORDED_REQUIRED_KEYS=NVIDIA_INFERENCE_KEY
-```
-
-Replay the recorded proxy pipelines:
-
-```bash
-make replay-cassettes RECORDED_TESTS=tests/recorded/server/experimental/openai
-```
-
-The [archived-field inventory](../server/experimental/conformance/openai/chat_completions/dialects/test_litellm.py)
-runs with the [conformance suite](../server/experimental/conformance/README.md)
-and reads the same cassettes without recording or replaying provider calls.
-
-The [proxy integration guide](server/experimental/README.md) describes the
-allow/block scenarios, reusable checker helper, single-use replay assertions,
-and the pattern for another operation. These tests combine recorded provider
-exchanges with synthetic checker decisions, not real Rails configuration.
-Replayed-body equality is not a claim of original provider-wire byte fidelity
-or live streaming delivery. Real-config and socket coverage is separate.
-
-The separately reviewed Responses recordings explicitly select the
-[LiteLLM Responses dialect](../../nemoguardrails/server/experimental/providers/openai/dialects/litellm/responses.md).
-Refresh only `tests/recorded/server/experimental/openai/test_litellm_responses.py`
-with `RECORDED_REQUIRED_KEYS=NVIDIA_INFERENCE_KEY`. Capture stores the complete
-sanitized response before checking policy; the subsequent offline replay is the
-acceptance gate. Responses uses the same shared sanitizer as Chat, with no extra
-content redaction; encrypted content and nested item-ID relationships are retained.
-The five cassettes cover buffered/streaming successes, invalid-model HTTP errors,
-and a longer stream used for overlapping-context blocking. They establish neither
-Chat bridge nor arbitrary-backend compatibility. The
-[proxy integration guide](server/experimental/README.md#litellm-responses-follow-up-captures)
-records provenance and the reason for the additional streaming capture.
-
-The six archived LiteLLM Chat cassettes predate the dialect: their provider payloads are unchanged.
-Two buffered successes contain message `provider_specific_fields: {refusal: null}`
-and empty choice extensions. Two streaming successes contain no extension bags;
-the other two responses are provider errors. The inventory tests validate every
-successful payload against runtime declarations and export and pin those evidence
-limits. The recordings do not establish the serving LiteLLM version or support
-for arbitrary backend fields. Native finish metadata and empty stream containers
-are covered by separately identified, source-backed unit fixtures, not invented
-recordings. A refresh must review new fields rather than modifying payloads to
-fit existing expectations.
+See the [proxy suite guide](server/experimental/README.md) for its endpoints,
+dialect selection, credentials, and capture provenance.
 
 `RECORDED_TESTS` is passed directly to pytest, so it can be a single test, a
 test class, several files, or a directory:
@@ -192,19 +131,14 @@ make snapshot-cassettes RECORDED_TESTS=tests/recorded/rails/public_api/test_gene
 
 ## Cassettes
 
-Rails tests use pytest-recording's default names:
+Use pytest-recording's default layout beside each test module:
 
 ```text
-tests/recorded/rails/<suite>/cassettes/<test_module>/<test_name>.yaml
+<suite>/cassettes/<test_module>/<test_name>.yaml
 ```
 
-Experimental server proxy recordings are grouped by provider:
-
-```text
-tests/recorded/server/experimental/<provider>/cassettes/<test_module>/<test_name>.yaml
-```
-
-Parameterized tests include the parameter id in the cassette filename. Every test (rails and clients) uses this default naming; do not add `@pytest.mark.default_cassette(...)`.
+Parameterized tests include the parameter id in the filename. Do not add
+`@pytest.mark.default_cassette(...)`.
 
 JSON request and response bodies are stored as `parsed_body` and rehydrated by `ReadableYamlSerializer` during replay. SSE responses use `parsed_body` events only when the shared serializer can
 rehydrate their framing faithfully. Other SSE bodies retain `string` storage,
@@ -215,7 +149,7 @@ Cassettes preserve scrubbed JSON text without smart-character normalization so p
 Inspect a cassette:
 
 ```bash
-uv run python -m tests.recorded.inspect_cassette tests/recorded/rails/public_api/cassettes/test_stream/test_openai_stream_async_public_contract.yaml
+uv run --locked python -m tests.recorded.inspect_cassette tests/recorded/rails/public_api/cassettes/test_stream/test_openai_stream_async_public_contract.yaml
 ```
 
 ## Snapshots
@@ -223,14 +157,14 @@ uv run python -m tests.recorded.inspect_cassette tests/recorded/rails/public_api
 Rails replay outputs are pinned with inline snapshots after normalization. Create or fix snapshots with:
 
 ```bash
-uv run pytest tests/recorded/rails --block-network --inline-snapshot=create
-uv run pytest tests/recorded/rails --block-network --inline-snapshot=fix
-uv run pytest tests/recorded/rails --block-network --inline-snapshot=review
+uv run --locked pytest tests/recorded/rails --block-network --inline-snapshot=create
+uv run --locked pytest tests/recorded/rails --block-network --inline-snapshot=fix
+uv run --locked pytest tests/recorded/rails --block-network --inline-snapshot=review
 ```
 
 Snapshot formatting uses `ruff format` through `[tool.inline-snapshot]` in `pyproject.toml`.
 Snapshot create/fix/review runs must be serial. Use `make record-cassettes` or a
-direct `uv run pytest ... --inline-snapshot=<mode>` command; the default
+direct `uv run --locked pytest ... --inline-snapshot=<mode>` command; the default
 `make test` path uses xdist, where inline-snapshot disables update and report
 modes.
 
