@@ -51,11 +51,11 @@ as opaque metadata. Synthetic source-valid cases still validate independently.
   verifies guarded/constrained/opaque decisions for both endpoints, and checks
   the complete LiteLLM graph against the reviewed extension inventory.
 - `test_http.py` exercises independently source-valid synthetic cases.
-- `dialects/test_litellm.py` tests closed extension bags and empty-only content
-  fields, including usage-only streaming events.
-- `dialects/test_litellm_inventory.py` audits the four successful gateway
-  recordings for observed extension bags and bound-policy/export acceptance.
-  It reads the original cassettes under `tests/recorded/` without provider calls.
+- `dialects/test_litellm.py` audits observed extension bags in the four successful
+  gateway recordings and checks bound-policy/export acceptance. Synthetic cases
+  test closed extension bags and empty-only content fields, including usage-only
+  streaming events. The original cassettes stay under `tests/recorded/`; these
+  checks make no provider calls.
 - `test_recorded_probes.py` keeps unmodified recordings as positive controls,
   then mutates copies in memory to try additional reasoning/refusal text,
   case aliases, logprobs, extra choices, and request controls. It checks both

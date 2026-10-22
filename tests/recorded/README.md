@@ -121,7 +121,7 @@ Replay the recorded proxy pipelines:
 make replay-cassettes RECORDED_TESTS=tests/recorded/server/experimental/openai
 ```
 
-The [archived-field inventory](../server/experimental/conformance/openai/chat_completions/dialects/test_litellm_inventory.py)
+The [archived-field inventory](../server/experimental/conformance/openai/chat_completions/dialects/test_litellm.py)
 runs with the [conformance suite](../server/experimental/conformance/README.md)
 and reads the same cassettes without recording or replaying provider calls.
 

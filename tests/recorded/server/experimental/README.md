@@ -13,7 +13,7 @@ endpoint for direct OpenAI recordings. The
 [LiteLLM Chat suite](openai/test_litellm_chat_completions.py) selects the LiteLLM
 dialect for the archived NVIDIA inference exchanges. Its six cassettes live in
 `openai/cassettes/test_litellm_chat_completions/`; their contents are unchanged.
-The [conformance inventory](../../../server/experimental/conformance/openai/chat_completions/dialects/test_litellm_inventory.py)
+The [conformance inventory](../../../server/experimental/conformance/openai/chat_completions/dialects/test_litellm.py)
 reads these cassettes to pin which extension shapes actually occurred and check
 runtime/export acceptance. It runs with the conformance suite, not cassette replay.
 

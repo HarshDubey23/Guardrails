@@ -13,15 +13,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Test reviewed LiteLLM extension boundaries through the real Chat transport.
+"""Check LiteLLM Chat boundaries against recorded evidence and synthetic cases.
 
-Cases follow the source inventory in providers/openai/dialects/litellm/README.md,
-not generated guard schemas. They are synthetic examples, not recordings or a
-claim that the OpenAI source fixture validates LiteLLM's extensions.
+Recorded cases audit observed fields and bound-policy/export acceptance without
+provider calls. Synthetic transport cases follow the reviewed source inventory;
+they do not claim that recordings exercise every extension or that the OpenAI
+source fixture validates LiteLLM's extensions.
 """
 
-import pytest
+import json
+from copy import deepcopy
+from pathlib import Path
 
+import pytest
+import yaml
+from jsonschema import Draft202012Validator
+
+from nemoguardrails.server.experimental.provider.contract_export import export_guard_contract
+from nemoguardrails.server.experimental.provider.sse import ServerSentEvent
+from nemoguardrails.server.experimental.provider.stream import StreamEventRole
 from nemoguardrails.server.experimental.providers.openai.chat_completions.endpoint import CHAT_COMPLETIONS_ENDPOINT
 from nemoguardrails.server.experimental.providers.openai.dialects.litellm.chat_completions import (
     LITELLM_CHAT_COMPLETIONS_ENDPOINT,
@@ -40,7 +50,6 @@ from tests.server.experimental.conformance.openai.chat_completions.support impor
 )
 
 pytestmark = [
-    pytest.mark.asyncio,
     pytest.mark.block_network(allowed_hosts=[r"^127\.0\.0\.1$", r"^::1$"]),
 ]
 TEXT = "Cafe\u0301 — “quoted” ☃"
@@ -61,6 +70,72 @@ ARRAY_LOCATIONS = [
     ]
     for field in fields
 ]
+
+
+CASSETTES = Path(__file__).parents[6] / "recorded/server/experimental/openai/cassettes/test_litellm_chat_completions"
+SUCCESS_RECORDINGS = (
+    "test_buffered_chat_preserves_guarded_constrained_and_opaque_contract_fields",
+    "test_nvidia_chat_source_profile_preserves_allowed_relay[buffered]",
+    "test_streaming_chat_preserves_declared_events_and_opaque_metadata",
+    "test_nvidia_chat_source_profile_preserves_allowed_relay[streaming]",
+)
+
+
+def extension_values(value):
+    """Find extension bags anywhere, including outside the inspected text path."""
+    if isinstance(value, dict):
+        for name, nested in value.items():
+            if name == "provider_specific_fields":
+                yield nested
+            yield from extension_values(nested)
+    elif isinstance(value, list):
+        for nested in value:
+            yield from extension_values(nested)
+
+
+@pytest.mark.parametrize("recording", SUCCESS_RECORDINGS)
+def test_recorded_inventory_matches_bound_policy_and_export(recording):
+    (interaction,) = yaml.safe_load((CASSETTES / f"{recording}.yaml").read_text())["interactions"]
+    request = interaction["request"]["parsed_body"]
+    response = interaction["response"]
+    body = response["body"]["parsed_body"]
+    original = deepcopy(body)
+    endpoint = LITELLM_CHAT_COMPLETIONS_ENDPOINT
+    document = export_guard_contract(endpoint)
+
+    assert response["status"]["code"] == 200
+    assert not {"caching", "num_retries", "guardrails", "fallbacks", "context_window_fallback_dict"} & request.keys()
+    endpoint.guarded_request_model.validate_payload(request)
+    Draft202012Validator(document["request"]).validate(request)
+
+    if request["stream"]:
+        assert list(extension_values(body)) == []
+        assert endpoint.stream is not None
+        adapter = endpoint.stream.create_adapter()
+        validator = Draft202012Validator(document["stream"])
+        text_events = 0
+        for payload in body:
+            if payload == "[DONE]":
+                data = b"[DONE]"
+            else:
+                validator.validate(payload)
+                data = json.dumps(payload).encode()
+            event = ServerSentEvent.from_bytes(b"data: " + data + b"\n\n")
+            classified = adapter.classify_event(event)
+            if classified.role is StreamEventRole.GUARDED_TEXT:
+                assert classified.text == payload["choices"][0]["delta"]["content"]
+                text_events += 1
+        adapter.validate_end_of_stream()
+        assert text_events > 0
+    else:
+        assert len(list(extension_values(body))) == 2
+        (choice,) = body["choices"]
+        assert choice["message"]["provider_specific_fields"] == {"refusal": None}
+        assert choice["provider_specific_fields"] == {}
+        assert type(body["usage"]["completion_tokens_details"]["reasoning_tokens"]) is int
+        endpoint.guarded_response_model.validate_payload(body)
+        Draft202012Validator(document["response"]).validate(body)
+    assert body == original
 
 
 def extension_body(streaming, path, value):
@@ -94,6 +169,7 @@ async def assert_extension_exchange(streaming, body, inspect, endpoint, accepted
         assert checker.text_calls == [("input", "question")]
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "endpoint", [CHAT_COMPLETIONS_ENDPOINT, LITELLM_CHAT_COMPLETIONS_ENDPOINT], ids=["openai", "litellm"]
 )
@@ -110,6 +186,7 @@ async def test_empty_extension_bags_require_explicit_dialect_selection(endpoint,
     )
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "endpoint", [CHAT_COMPLETIONS_ENDPOINT, LITELLM_CHAT_COMPLETIONS_ENDPOINT], ids=["openai", "litellm"]
 )
@@ -126,6 +203,7 @@ async def test_empty_content_extensions_do_not_add_inspection_targets(endpoint, 
     )
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "endpoint", [CHAT_COMPLETIONS_ENDPOINT, LITELLM_CHAT_COMPLETIONS_ENDPOINT], ids=["openai", "litellm"]
 )
@@ -147,6 +225,7 @@ async def test_reviewed_buffered_members_preserve_bytes_without_changing_checked
     )
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("inspect", [False, True], ids=["relay", "inspected"])
 @pytest.mark.parametrize("streaming,path", ARRAY_LOCATIONS)
 async def test_nonempty_content_extensions_are_withheld_when_inspected(inspect, streaming, path):
@@ -159,6 +238,7 @@ async def test_nonempty_content_extensions_are_withheld_when_inspected(inspect, 
     )
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("inspect", [False, True], ids=["relay", "inspected"])
 @pytest.mark.parametrize("streaming,path", EXTENSION_LOCATIONS)
 async def test_unreviewed_extension_members_fail_closed_at_every_container(inspect, streaming, path):
@@ -171,6 +251,7 @@ async def test_unreviewed_extension_members_fail_closed_at_every_container(inspe
     )
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("inspect", [False, True], ids=["relay", "inspected"])
 @pytest.mark.parametrize(
     "path,value",
@@ -185,6 +266,7 @@ async def test_buffered_extension_permissions_do_not_leak_into_streams(inspect, 
     )
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("inspect", [False, True], ids=["relay", "inspected"])
 @pytest.mark.parametrize("extensions", [{}, {"future_content": "unreviewed text"}], ids=["reviewed", "unreviewed"])
 async def test_usage_only_events_keep_metadata_role_without_bypassing_extension_validation(inspect, extensions):
