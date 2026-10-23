@@ -77,8 +77,11 @@ def test_native_metadata_is_shared_and_preserves_the_original_payload(name, valu
     [{"guardrails": []}, {"fallbacks": []}, {"billing": {}}, {"input": []}, {"tools": []}, {"instructions": "hidden"}],
 )
 def test_dialect_does_not_enable_gateway_request_controls_or_extra_content(updates):
+    model = LITELLM_RESPONSES_ENDPOINT.guarded_request_model
+    payload = {"input": "hello", "store": False}
+    model.validate_payload(payload)
     with pytest.raises(ValidationError):
-        LITELLM_RESPONSES_ENDPOINT.guarded_request_model.validate_payload({"input": "hello", **updates})
+        model.validate_payload({**payload, **updates})
 
 
 @pytest.mark.parametrize(
