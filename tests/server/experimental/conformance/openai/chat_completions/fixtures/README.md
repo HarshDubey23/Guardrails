@@ -13,7 +13,7 @@ licensed MIT. Original source SHA-256:
 Extract SHA-256:
 `a84917786d64f8a04998da6f166b9b293eba20a1f093dd49ac69a1498f78454f`.
 
-See the [conformance guide](../../../README.md) for test scope and the source's
+See the [Chat conformance guide](../README.md) for test scope and the source's
 legacy `nullable` interpretation.
 
 To reproduce, download the descriptor's exact `download_url`, then run:

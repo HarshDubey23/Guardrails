@@ -18,8 +18,22 @@ reviewed LiteLLM source establish root SSE `model` as a dialect extension.
 These distinctions are explicit test expectations, never generated from runtime
 policy. Presence alone does not establish that a field should be opaque.
 
-The [Responses guide](../README.md) gives exact regeneration commands. Extraction
-verifies the source digest and accepts only local schema references. The fixture
-is checked in with LF endings for a stable digest on Windows. Updating the pin
-requires regenerating the inventory, reviewing classification decisions, and
-updating the fixture digest here and in `../test_schema.py`.
+## Regeneration
+
+From the repository root, download the pinned source and run the extractor:
+
+```bash
+curl --fail --location \
+  https://raw.githubusercontent.com/openai/openai-openapi/df63773f69f542ef875b9f00c3837c25ba5f4f2a/openapi.yaml \
+  --output /tmp/openai-responses-source.yaml
+uv run --locked python tests/server/experimental/conformance/openai/responses/fixtures/extract_source.py \
+  /tmp/openai-responses-source.yaml \
+  nemoguardrails/server/experimental/contracts/openai/source.yaml \
+  tests/server/experimental/conformance/openai/responses/fixtures/source_inventory.json
+make test TEST=tests/server/experimental/conformance/openai/responses/test_schema.py
+```
+
+Extraction verifies the source digest and accepts only local schema references.
+The fixture uses LF endings for a stable digest on Windows. Updating the pin
+requires reviewing new fields and classification decisions, regenerating the
+inventory, and updating its digest here and in `../test_schema.py`.

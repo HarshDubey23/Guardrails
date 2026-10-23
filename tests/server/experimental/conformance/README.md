@@ -1,75 +1,39 @@
 # Offline provider conformance
 
-These tests compare an independently pinned provider specification, authoritative
-typed Python declarations, and observable proxy behavior. They currently cover
-OpenAI Chat Completions and Responses, each with an explicitly selected LiteLLM
-dialect. They do not establish compatibility with every OpenAI-compatible deployment.
+These tests compare independent provider specifications and recordings with
+typed field policies and observable proxy behavior. Export agreement checks
+consistency; it does not establish that a field classification is correct.
 
 ## Coverage
 
-- `openai/chat_completions/test_schema.py` audits every bound policy model
-  against its inspected source object, including reviewed opaque fields and
-  explicit local extensions. Export consistency is a secondary check.
-- `openai/chat_completions/test_http.py` exercises the actual router and HTTP
-  dispatcher with synthetic source-valid examples. It checks metadata and byte
-  preservation, exact inspected text, unsupported content, error envelopes, and
-  buffered/streaming behavior with inspection enabled or disabled.
-- `openai/chat_completions/dialects/test_litellm.py` checks dialect selection, extension
-  preservation, rejection of unreviewed content, and unchanged text targets
-  through the same HTTP harness. Cases follow the
-  [reviewed LiteLLM source inventory](../../../../nemoguardrails/server/experimental/providers/openai/dialects/litellm/README.md),
-  not the OpenAI schema or additional recordings.
+| Operation | Evidence and checks |
+| --- | --- |
+| [Chat Completions](openai/chat_completions/README.md) | Pinned OpenAPI field inventories, source-valid synthetic HTTP cases, and reviewed LiteLLM extensions. |
+| [Responses](openai/responses/README.md) | Pinned field inventories, provider examples, native/gateway recordings, and synthetic mutations of recorded bodies. |
 
-- `openai/responses/test_schema.py` audits bound request, response, and event
-  models against the pinned source inventory and official example, with explicit
-  native additions. Export consistency remains a secondary check.
-- `openai/responses/test_http.py` injects labeled synthetic mutations of native
-  recordings through the actual HTTP path. It checks request admission, additional
-  text channels, and snapshot consistency with inspection enabled and disabled.
-- `openai/responses/dialects/test_litellm.py` checks the selected dialect against
-  gateway evidence, shared native metadata, root event annotations, and unsupported
-  containers/errors. The [Responses guide](openai/responses/README.md) includes
-  provenance, reproduction commands, and independent reviewer probes.
+Tests use deterministic checker doubles and mocked network I/O. They do not
+exercise real Rails configurations, socket delivery, or live-provider behavior.
+Guard models are partial content policies, not complete provider validators.
+Guarded-request validation still applies when output inspection is disabled.
 
-`openai/chat_completions/http_support.py` shares the Chat router/transport harness and error
-assertions; `openai/chat_completions/support.py` holds Chat payload and source helpers. Checker
-doubles remain shared across server tests in `../checkers.py`. Responses probes
-reuse `../responses_proxy.py`, also used by the recorded suites; their evidence
-loaders and mutation helpers live in `openai/responses/support.py`.
+## Reviewer probes
 
-Disabling inspection does not remove guarded-request validation. Unknown output
-content fails closed when inspected and is relayed unchanged when uninspected.
-Existing recorded and kernel tests cover checker blocking, stream sequencing,
-and cleanup; this suite adds independent source evidence rather than duplicating
-those tests.
+When extending coverage, check the evidence independently of runtime declarations:
 
-These are offline tests with deterministic checker doubles and mocked network
-I/O. They do not validate real Rails configurations, socket delivery, application
-lifecycle, or current live-provider behavior. Guard models are partial policy
-projections, not complete provider validators; field coverage is not exhaustive
-value or combination coverage.
+1. Compare source properties and example/recorded keys at each object boundary.
+   Account for omissions and native/dialect differences explicitly.
+2. Trace additional input, tools, reasoning, refusals, citations, and extension
+   fields to inspection or rejection. Opaque values, including nested strings,
+   remain uninspected.
+3. Check unknown fields, case aliases, repeated snapshots, and request admission
+   with output inspection disabled. Reuse recorded/kernel tests for blocking
+   and protocol lifecycle checks.
+4. Keep provider recordings distinct from synthetic payload mutations and checker
+   verdicts. Report a field path, evidence reference, and minimal reproduction.
 
-## Important limitations
-
-The router guards `POST /v1/chat/completions`. The documented collection operation,
-`GET /v1/chat/completions`, returns 405 at this guarded path. The four documented
-item operations on `/v1/chat/completions/{id}` and its `/messages` child are relayed
-without guardrails. Their tests check transport preservation, not full provider-schema
-validation.
-
-The [pinned source](openai/chat_completions/fixtures/README.md) declares OpenAPI 3.1 but uses
-legacy `nullable` annotations, including beside enums and references.
-`openai/chat_completions/support.py` explicitly interprets them for validation without
-changing fixture bytes or runtime policy. This adapter supports the constructs
-used by this pin, not arbitrary OpenAPI documents. Review its interpretation
-when updating the source.
-
-## Extending coverage
-
-For another operation or dialect, identify independent source evidence, audit
-the actual bound models, and supply explicit valid and unsupported examples with
-independent expected outcomes. Reuse checker helpers and existing kernel tests;
-keep event sequencing, terminal markers, and error envelopes protocol-specific.
+Pin source provenance and expected outcomes independently. Updating a source or
+recording requires reviewing new fields, not deriving expected policies from
+the implementation being tested.
 
 ## Running tests
 
@@ -84,5 +48,5 @@ To include related kernel, export, dialect, transport, and recorded tests:
 ```bash
 make test WORKERS=0 \
   TEST='tests/server/experimental tests/recorded/server/experimental' \
-  ARGS='--block-network -q'
+  ARGS='--block-network --record-mode=none -q'
 ```
