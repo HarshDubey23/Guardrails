@@ -80,7 +80,7 @@ def main():
     pin = yaml.safe_load(args.descriptor.read_text(encoding="utf-8"))
     inventory = extract_inventory(args.source.read_bytes(), pin)
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(inventory, indent=2) + "\n", encoding="utf-8")
+    args.output.write_text(json.dumps(inventory, indent=2) + "\n", encoding="utf-8", newline="\n")
 
 
 if __name__ == "__main__":

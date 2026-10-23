@@ -108,7 +108,9 @@ def main() -> None:
     parser.add_argument("output", type=Path)
     args = parser.parse_args()
     extracted = extract_chat_source(args.source, args.descriptor)
-    args.output.write_text(yaml.safe_dump(extracted, sort_keys=False, allow_unicode=True), encoding="utf-8")
+    args.output.write_text(
+        yaml.safe_dump(extracted, sort_keys=False, allow_unicode=True), encoding="utf-8", newline="\n"
+    )
 
 
 if __name__ == "__main__":
