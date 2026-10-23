@@ -128,25 +128,19 @@ exchanges with synthetic checker decisions, not real Rails configuration.
 Replayed-body equality is not a claim of original provider-wire byte fidelity
 or live streaming delivery. Real-config and socket coverage is separate.
 
-The separately reviewed Responses recordings explicitly select the
-[LiteLLM Responses dialect](../../nemoguardrails/server/experimental/providers/openai/dialects/litellm/responses.md).
-Refresh only `tests/recorded/server/experimental/openai/test_litellm_responses.py`
-with `RECORDED_REQUIRED_KEYS=NVIDIA_INFERENCE_KEY`. Capture stores the complete
-sanitized response before checking policy; the subsequent offline replay is the
-acceptance gate. Responses uses the same shared sanitizer as Chat, with no extra
-content redaction; encrypted content and nested item-ID relationships are retained.
-These two cassettes establish neither Chat bridge nor arbitrary-backend compatibility.
+The six Chat proxy cassettes contain two buffered successes with message
+`provider_specific_fields: {refusal: null}` and empty choice extensions, two
+streaming successes without extension bags, and two provider errors. Inventory
+tests check successful payloads against runtime declarations and export.
+Native finish metadata and empty stream containers have separate source-backed
+unit fixtures. These recordings do not establish the serving LiteLLM version or
+support for arbitrary backend fields; review new fields when refreshing them.
 
-These six cassettes predate the dialect: their provider payloads are unchanged.
-Two buffered successes contain message `provider_specific_fields: {refusal: null}`
-and empty choice extensions. Two streaming successes contain no extension bags;
-the other two responses are provider errors. The inventory tests validate every
-successful payload against runtime declarations and export and pin those evidence
-limits. The recordings do not establish the serving LiteLLM version or support
-for arbitrary backend fields. Native finish metadata and empty stream containers
-are covered by separately identified, source-backed unit fixtures, not invented
-recordings. A refresh must review new fields rather than modifying payloads to
-fit existing expectations.
+For LiteLLM Responses, refresh
+`tests/recorded/server/experimental/openai/test_litellm_responses.py` with
+`RECORDED_REQUIRED_KEYS=NVIDIA_INFERENCE_KEY`. The
+[Responses dialect guide](../../nemoguardrails/server/experimental/providers/openai/dialects/litellm/responses.md)
+documents the two cassettes, compatibility limits, and required offline replay.
 
 `RECORDED_TESTS` is passed directly to pytest, so it can be a single test, a
 test class, several files, or a directory:

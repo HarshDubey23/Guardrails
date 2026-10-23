@@ -1,8 +1,7 @@
 # LiteLLM Chat dialect
 
-For the separately reviewed Responses operation, see the
-[LiteLLM Responses dialect](responses.md). Chat extension bags and backend
-evidence do not automatically apply to Responses.
+For Responses, see the [LiteLLM Responses dialect](responses.md), which has
+its own supported boundary and compatibility evidence.
 
 This experimental dialect applies the `single_text.v1` guardrail profile to
 reviewed LiteLLM Chat Completions wire shapes. Typed Python declarations in
