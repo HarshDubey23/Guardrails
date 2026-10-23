@@ -31,10 +31,10 @@ beside enums and references. `support.py` interprets these constructs for
 validation without changing fixture bytes or runtime policy. Review that
 interpretation when updating the source pin.
 
-The router guards `POST /v1/chat/completions`; collection `GET` returns 405.
-The four item operations on `/v1/chat/completions/{id}` and its `/messages` child
-are unguarded passthrough. Their tests check transport preservation, not content
-inspection or full provider-schema validation.
+The router guards `POST /v1/chat/completions`. Collection `GET` and the four item
+operations on `/v1/chat/completions/{id}` and its `/messages` child are unguarded
+passthrough. Their tests check transport preservation, not content inspection or
+full provider-schema validation.
 
 ## Run and extend
 
